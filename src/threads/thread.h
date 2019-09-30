@@ -91,7 +91,7 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
 
     struct list_elem sleep_elem;           /* List element for sleep_list. */
-    int64_t *wakeup_tick;               /* wakeup tick to get rid of busy waiting */
+    int64_t wakeup_tick;               /* wakeup tick to get rid of busy waiting */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -119,6 +119,8 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
+void thread_wakeup(void);
+void thread_sleep(int64_t ticks);
 void thread_block (void);
 void thread_unblock (struct thread *);
 

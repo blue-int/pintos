@@ -87,7 +87,7 @@ bool prio_comp_func(const struct list_elem *a, const struct list_elem *b, void *
 bool tick_comp_func(const struct list_elem *a, const struct list_elem *b, void *aux){
   struct thread *aT = list_entry(a, struct thread, sleep_elem);
   struct thread *bT = list_entry(b, struct thread, sleep_elem);
-  return aT->wakeup_tick > bT->wakeup_tick;
+  return aT->wakeup_tick < bT->wakeup_tick;
 }
 
 /* Initializes the threading system by transforming the code
@@ -191,6 +191,7 @@ thread_create (const char *name, int priority,
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
   tid_t tid;
+  enum intr_level old_level;
 
   ASSERT (function != NULL);
 
@@ -202,6 +203,11 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+
+  /* Prepare thread for first run by initializing its stack.
+     Do this atomically so intermediate values for the 'stack' 
+     member cannot be observed. */
+  old_level = intr_disable ();
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -217,6 +223,8 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+
+  intr_set_level (old_level);
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -235,24 +243,52 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
+  thread_current ()->status =  THREAD_BLOCKED;
 
-  thread_current ()->status = THREAD_BLOCKED;
   schedule ();
 }
 
 void
-thread_sleep (void)
+thread_sleep (int64_t ticks)
 {
-  //interrupt off
+  enum intr_level old_level;
+
+  old_level = intr_disable ();
+  //interrupt off and store the old interrupt value
+
+  struct thread *t = running_thread ();
+  t->wakeup_tick = ticks;
+  //take the running thread, and set the thread's wakeup_tick to ticks
+
+  if(t != idle_thread)
+    list_insert_ordered(&sleep_list, &t->sleep_elem, tick_comp_func, 0);
   //list push
+
+  thread_block();
   //block
+
+  intr_set_level (old_level);
   //interrupt on
 }
 
 void
-thread_wake (void)
+thread_wakeup (void)
 {
-  //check the first element of sleep_list
+  while(true){
+    if(list_empty(&sleep_list)){
+      return;
+    }
+    struct thread *t = list_entry(list_front(&sleep_list), struct thread, sleep_elem);
+    ASSERT (is_thread (t));
+    int64_t current_tick = timer_ticks();
+    if(t->wakeup_tick <= current_tick){
+      list_pop_front(&sleep_list);
+      thread_unblock(t);
+    }
+    else{
+      break;
+    }   
+  }
   //if wakeup_tick < current tick, wake up
 }
 
@@ -488,8 +524,6 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
-  enum intr_level old_level;
-
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
   ASSERT (name != NULL);
@@ -501,9 +535,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   t->wakeup_tick = -1;
-  old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
-  intr_set_level (old_level);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
