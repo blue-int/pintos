@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -74,20 +75,20 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-bool prio_comp_func(const struct list_elem *a, const struct list_elem *b, void *aux);
-bool tick_comp_func(const struct list_elem *a, const struct list_elem *b, void *aux);
+bool prio_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool tick_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 
-bool prio_comp_func(const struct list_elem *a, const struct list_elem *b, void *aux){
-  struct thread *aT = list_entry(a, struct thread, elem);
-  struct thread *bT = list_entry(b, struct thread, elem);
+bool prio_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+  struct thread *aT = list_entry (a, struct thread, elem);
+  struct thread *bT = list_entry (b, struct thread, elem);
   return aT->priority > bT->priority;
 }
 
-bool tick_comp_func(const struct list_elem *a, const struct list_elem *b, void *aux){
-  struct thread *aT = list_entry(a, struct thread, sleep_elem);
-  struct thread *bT = list_entry(b, struct thread, sleep_elem);
-  return aT->wakeup_tick > bT->wakeup_tick;
+bool tick_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+  struct thread *aT = list_entry (a, struct thread, sleep_elem);
+  struct thread *bT = list_entry (b, struct thread, sleep_elem);
+  return aT->wakeup_tick < bT->wakeup_tick;
 }
 
 /* Initializes the threading system by transforming the code
@@ -241,34 +242,34 @@ thread_block (void)
 }
 
 void
-thread_sleep (int64_t wakeup_ticks)
+thread_sleep (int64_t wakeup_tick)
 {
+  // disable interrupt and store the old value
   enum intr_level old_level = intr_disable ();
+
   struct thread *t = thread_current ();
-  t->wakeup_tick = wakeup_ticks;
+  t->wakeup_tick = wakeup_tick;
   if (t != idle_thread)
-    list_insert_ordered(&sleep_list, &t->sleep_elem, tick_comp_func, NULL);
+    list_insert_ordered (&sleep_list, &t->sleep_elem, tick_comp_func, NULL);
   thread_block ();
+
   intr_set_level (old_level);
 }
 
 void
 thread_wakeup (void)
 {
-  //check the first element of sleep_list
-  //if wakeup_tick < current tick, wake up
-  struct list_elem *e;
-  struct thread *t;
-  while (list_size (&sleep_list) != 0) {
-    e = list_front(&sleep_list);
-    t = list_entry(e, struct thread, sleep_elem);
+  // check the first element of sleep_list which is ordered by wakeup_tick
+  // if wakeup_tick < current tick, wake up
+  while (!list_empty (&sleep_list)) {
+    struct thread *t = list_entry (list_front (&sleep_list), struct thread, sleep_elem);
+    ASSERT (is_thread (t));
+
     int64_t current_tick = timer_ticks ();
     if (t->wakeup_tick <= current_tick) {
-      list_pop_front(&sleep_list);
-      thread_unblock(t);
-    } else {
-      break;
-    }
+      list_pop_front (&sleep_list);
+      thread_unblock (t);
+    } else break;
   }
 }
 
