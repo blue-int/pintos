@@ -241,19 +241,35 @@ thread_block (void)
 }
 
 void
-thread_sleep (void)
+thread_sleep (int64_t wakeup_ticks)
 {
-  //interrupt off
-  //list push
-  //block
-  //interrupt on
+  enum intr_level old_level = intr_disable ();
+  struct thread *t = thread_current ();
+  t->wakeup_tick = wakeup_ticks;
+  if (t != idle_thread)
+    list_insert_ordered(&sleep_list, &t->sleep_elem, tick_comp_func, NULL);
+  thread_block ();
+  intr_set_level (old_level);
 }
 
 void
-thread_wake (void)
+thread_wakeup (void)
 {
   //check the first element of sleep_list
   //if wakeup_tick < current tick, wake up
+  struct list_elem *e;
+  struct thread *t;
+  while (list_size (&sleep_list) != 0) {
+    e = list_front(&sleep_list);
+    t = list_entry(e, struct thread, sleep_elem);
+    int64_t current_tick = timer_ticks ();
+    if (t->wakeup_tick <= current_tick) {
+      list_pop_front(&sleep_list);
+      thread_unblock(t);
+    } else {
+      break;
+    }
+  }
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.

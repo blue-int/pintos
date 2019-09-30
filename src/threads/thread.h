@@ -91,7 +91,7 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
 
     struct list_elem sleep_elem;           /* List element for sleep_list. */
-    int64_t *wakeup_tick;               /* wakeup tick to get rid of busy waiting */
+    int64_t wakeup_tick;               /* wakeup tick to get rid of busy waiting */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -140,5 +140,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void thread_sleep(int64_t wakeup_ticks);
+void thread_wakeup(void);
 
 #endif /* threads/thread.h */
