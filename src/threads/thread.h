@@ -90,6 +90,7 @@ struct thread
     int priority;                       /* Priority. */
     int priority_original;              /* Original Priority. */
     struct list lock_list;              /* List of locks which the thread acquired */
+    struct lock* host_lock;
     struct list_elem allelem;           /* List element for all threads list. */
 
     struct list_elem sleep_elem;           /* List element for sleep_list. */

@@ -648,6 +648,9 @@ thread_change_priority (struct thread *t, int priority)
   t->priority = priority;
   list_remove (&t->elem);
   list_insert_ordered (&ready_list, &t->elem, prio_comp_func, NULL);
+  if (t->host_lock != NULL) {
+    thread_change_priority (t->host_lock->holder, priority);
+  }
   thread_reschedule ();
 }
 
