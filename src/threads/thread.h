@@ -88,6 +88,7 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int priority_original;
     struct list_elem allelem;           /* List element for all threads list. */
 
     struct list_elem sleep_elem;           /* List element for sleep_list. */
@@ -109,6 +110,9 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+
+bool prio_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool tick_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 void thread_init (void);
 void thread_start (void);
@@ -143,5 +147,6 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+void thread_change_priority (struct thread *t, int priority);
 void thread_reschedule (void);
 #endif /* threads/thread.h */

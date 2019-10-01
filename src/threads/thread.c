@@ -75,8 +75,6 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-bool prio_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-bool tick_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 
 bool prio_comp_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
@@ -392,6 +390,7 @@ thread_set_priority (int new_priority)
 {
   struct thread *cur = thread_current ();
   cur->priority = new_priority;
+  cur->priority_original = new_priority;
   thread_reschedule ();
 }
 
@@ -519,6 +518,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->priority_original = priority;
   t->magic = THREAD_MAGIC;
   t->wakeup_tick = -1;
   old_level = intr_disable ();
@@ -639,6 +639,16 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void
+thread_change_priority (struct thread *t, int priority)
+{
+  ASSERT (is_thread (t));
+  t->priority = priority;
+  list_remove (&t->elem);
+  list_insert_ordered (&ready_list, &t->elem, prio_comp_func, NULL);
+  thread_reschedule ();
+}
 
 void
 thread_reschedule (void)
