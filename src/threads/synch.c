@@ -251,6 +251,12 @@ lock_release (struct lock *lock)
   list_remove (&lock->lock_elem);
   sema_up (&lock->semaphore);
   
+  lock_priority_recalculate ();
+}
+
+void
+lock_priority_recalculate (void) {
+
   struct thread *cur = thread_current ();
   cur->priority = cur->priority_original;
   struct list_elem *e;

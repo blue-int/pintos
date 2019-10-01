@@ -391,7 +391,8 @@ thread_set_priority (int new_priority)
   struct thread *cur = thread_current ();
   cur->priority = new_priority;
   cur->priority_original = new_priority;
-  thread_reschedule ();
+  
+  lock_priority_recalculate ();
 }
 
 /* Returns the current thread's priority. */
@@ -646,8 +647,6 @@ thread_change_priority (struct thread *t, int priority)
 {
   ASSERT (is_thread (t));
   t->priority = priority;
-  list_remove (&t->elem);
-  list_insert_ordered (&ready_list, &t->elem, prio_comp_func, NULL);
   if (t->host_lock != NULL) {
     thread_change_priority (t->host_lock->holder, priority);
   }
