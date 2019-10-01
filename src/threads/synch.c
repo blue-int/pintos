@@ -199,6 +199,7 @@ lock_acquire (struct lock *lock)
     lock_priority_donation (lock);
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+  list_push_back (&thread_current ()->lock_list, &lock->lock_elem);
 }
 
 void
@@ -244,8 +245,25 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
+  list_remove (&lock->lock_elem);
   sema_up (&lock->semaphore);
-  thread_set_priority (thread_current ()->priority_original);
+  
+  struct thread *cur = thread_current ();
+  cur->priority = cur->priority_original;
+  struct list_elem *e;
+  struct list *lock_list = &cur->lock_list;
+  for (e = list_begin (lock_list); e != list_end (lock_list); e = list_next (e)) {
+    struct lock *lock = list_entry (e, struct lock, lock_elem);
+    struct semaphore *sema = &lock->semaphore;
+    struct list *waiters = &sema->waiters;
+    struct list_elem *elem;
+    for (elem = list_begin (waiters); elem != list_end (waiters); elem = list_next (elem)) {
+      struct thread *waiter = list_entry (elem, struct thread, elem);
+      if (cur->priority < waiter->priority)
+        cur->priority = waiter->priority;
+    }
+  }
+  thread_reschedule ();
 }
 
 /* Returns true if the current thread holds LOCK, false

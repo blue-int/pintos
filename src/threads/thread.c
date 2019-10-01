@@ -519,6 +519,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->priority_original = priority;
+  list_init (&t->lock_list);
   t->magic = THREAD_MAGIC;
   t->wakeup_tick = -1;
   old_level = intr_disable ();
@@ -653,6 +654,7 @@ thread_change_priority (struct thread *t, int priority)
 void
 thread_reschedule (void)
 {
+  enum intr_level old_level = intr_disable ();
   struct thread *cur = thread_current ();
   if (!list_empty (&ready_list)) {
     struct list_elem *e = list_front (&ready_list);
@@ -661,4 +663,5 @@ thread_reschedule (void)
       thread_yield ();
     }
   }
+  intr_set_level (old_level);
 }
