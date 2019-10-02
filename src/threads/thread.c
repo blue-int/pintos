@@ -394,6 +394,7 @@ thread_set_priority (int new_priority)
   cur->priority_original = new_priority;
   
   lock_priority_recalculate ();
+  thread_reschedule ();
 }
 
 /* Returns the current thread's priority. */
@@ -649,6 +650,10 @@ thread_change_priority (struct thread *t, int priority)
   ASSERT (is_thread (t));
   t->priority = priority;
   if (t->host_lock != NULL) {
+    struct semaphore *sema = &t->host_lock->semaphore;
+    struct list *waiters = &sema->waiters;
+    list_sort(waiters, prio_comp_func, NULL);
+
     thread_change_priority (t->host_lock->holder, priority);
   }
   thread_reschedule ();
