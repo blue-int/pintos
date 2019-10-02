@@ -393,6 +393,7 @@ thread_set_priority (int new_priority)
   cur->priority_original = new_priority;
   
   lock_priority_recalculate ();
+  thread_reschedule ();
 }
 
 /* Returns the current thread's priority. */
@@ -523,6 +524,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->lock_list);
   t->magic = THREAD_MAGIC;
   t->wakeup_tick = -1;
+  t->host_lock = NULL;
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
@@ -648,6 +650,10 @@ thread_change_priority (struct thread *t, int priority)
   ASSERT (is_thread (t));
   t->priority = priority;
   if (t->host_lock != NULL) {
+    struct lock *host_lock = t->host_lock;
+    struct semaphore *sema = &host_lock->semaphore;
+    struct list *waiters = &sema->waiters;
+    list_sort (waiters, prio_comp_func, NULL);
     thread_change_priority (t->host_lock->holder, priority);
   }
   thread_reschedule ();
