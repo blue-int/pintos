@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+bool prio_lock_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -217,6 +219,7 @@ lock_priority_donation (struct lock *lock)
   if (holder->priority < cur->priority) {
     thread_change_priority (holder, cur->priority);
   }
+
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -249,7 +252,7 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-
+  
   lock->holder = NULL;
   list_remove (&lock->lock_elem);
   lock_priority_recalculate ();

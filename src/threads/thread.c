@@ -202,6 +202,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -650,10 +651,10 @@ thread_change_priority (struct thread *t, int priority)
   ASSERT (is_thread (t));
   t->priority = priority;
   if (t->host_lock != NULL) {
-    struct lock *host_lock = t->host_lock;
-    struct semaphore *sema = &host_lock->semaphore;
+    struct semaphore *sema = &t->host_lock->semaphore;
     struct list *waiters = &sema->waiters;
-    list_sort (waiters, prio_comp_func, NULL);
+    list_sort(waiters, prio_comp_func, NULL);
+
     thread_change_priority (t->host_lock->holder, priority);
   }
   thread_reschedule ();
@@ -662,7 +663,9 @@ thread_change_priority (struct thread *t, int priority)
 void
 thread_reschedule (void)
 {
-  enum intr_level old_level = intr_disable ();
+  enum intr_level old_level;
+  old_level = intr_disable();
+
   struct thread *cur = thread_current ();
   if (!list_empty (&ready_list)) {
     struct list_elem *e = list_front (&ready_list);
