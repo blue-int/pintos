@@ -391,22 +391,9 @@ thread_set_priority (int new_priority)
 {
   struct thread *cur = thread_current ();
   cur->priority = new_priority;
-  if(!list_empty(&cur->lock_list)){
-    struct list *lock_list = &cur->lock_list;
-    struct list_elem *e;
-    for (e = list_begin (lock_list); e != list_end (lock_list); e = list_next (e)) {
-      struct lock *lock = list_entry (e, struct lock, lock_elem);
-      struct semaphore *sema = &lock->semaphore;
-      struct list *waiters = &sema->waiters;
-      struct list_elem *elem;
-      for (elem = list_begin (waiters); elem != list_end (waiters); elem = list_next (elem)) {
-        struct thread *waiter = list_entry (list_front (waiters), struct thread, elem);
-        if (cur->priority < waiter->priority)
-          cur->priority = waiter->priority;
-      }
-    }
-  }
-  thread_reschedule ();
+  cur->priority_original = new_priority;
+  
+  lock_priority_recalculate ();
 }
 
 /* Returns the current thread's priority. */
@@ -533,8 +520,8 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  list_init (&t ->lock_list);
-  t->host_lock = NULL;
+  t->priority_original = priority;
+  list_init (&t->lock_list);
   t->magic = THREAD_MAGIC;
   t->wakeup_tick = -1;
   old_level = intr_disable ();
@@ -661,10 +648,9 @@ thread_change_priority (struct thread *t, int priority)
 {
   ASSERT (is_thread (t));
   t->priority = priority;
-  // list_remove (&t->elem);
-  // list_insert_ordered (&sleep_list, &t->elem, prio_comp_func, NULL);
-  if(t->host_lock != NULL)
-    thread_change_priority(t->host_lock->holder, priority);
+  if (t->host_lock != NULL) {
+    thread_change_priority (t->host_lock->holder, priority);
+  }
   thread_reschedule ();
 }
 
@@ -682,7 +668,5 @@ thread_reschedule (void)
       thread_yield ();
     }
   }
-
-  intr_set_level(old_level);
-
+  intr_set_level (old_level);
 }

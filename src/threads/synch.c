@@ -73,6 +73,7 @@ sema_down (struct semaphore *sema)
       list_insert_ordered (&sema->waiters, &thread_current ()->elem, prio_comp_func, NULL);
       thread_block ();
     }
+  thread_current ()->host_lock = NULL;
   sema->value--;
   thread_current ()->host_lock = NULL;
   intr_set_level (old_level);
@@ -201,19 +202,11 @@ lock_acquire (struct lock *lock)
 
   if (lock->holder != NULL)
     lock_priority_donation (lock);
-  thread_current()->host_lock = lock;
+  thread_current ()->host_lock = lock;
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
-  lock->priority = thread_current () -> priority;
-  // list_insert_ordered(&thread_current ()->lock_list, &lock->lock_elem, prio_lock_func, 0);
-  list_push_back(&thread_current()->lock_list, &lock->lock_elem);
-} 
-
-// bool prio_lock_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
-//   struct lock *aL = list_entry (a, struct lock, lock_elem);
-//   struct lock *bL = list_entry (b, struct lock, lock_elem);
-//   return aL->priority > bL->priority;
-// }
+  list_push_back (&thread_current ()->lock_list, &lock->lock_elem);
+}
 
 void
 lock_priority_donation (struct lock *lock)
@@ -259,9 +252,16 @@ lock_release (struct lock *lock)
   
   lock->holder = NULL;
   list_remove (&lock->lock_elem);
+  sema_up (&lock->semaphore);
   
+  lock_priority_recalculate ();
+}
+
+void
+lock_priority_recalculate (void) {
+
   struct thread *cur = thread_current ();
-  cur->priority = lock->priority;
+  cur->priority = cur->priority_original;
   struct list_elem *e;
   struct list *lock_list = &cur->lock_list;
   for (e = list_begin (lock_list); e != list_end (lock_list); e = list_next (e)) {
@@ -270,13 +270,12 @@ lock_release (struct lock *lock)
     struct list *waiters = &sema->waiters;
     struct list_elem *elem;
     for (elem = list_begin (waiters); elem != list_end (waiters); elem = list_next (elem)) {
-      struct thread *waiter = list_entry (list_front (waiters), struct thread, elem);
+      struct thread *waiter = list_entry (elem, struct thread, elem);
       if (cur->priority < waiter->priority)
         cur->priority = waiter->priority;
     }
   }
-  sema_up (&lock->semaphore);
-  thread_reschedule();
+  thread_reschedule ();
 }
 
 /* Returns true if the current thread holds LOCK, false
