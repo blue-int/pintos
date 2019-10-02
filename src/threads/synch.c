@@ -32,7 +32,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-bool prio_lock_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool prio_cond_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -295,6 +295,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
+    int priority;                       /* Current Priority */
   };
 
 /* Initializes condition variable COND.  A condition variable
@@ -339,10 +340,19 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered (&cond->waiters, &waiter.elem, prio_comp_func, NULL);
+  (&waiter)->priority = thread_current ()->priority;
+  list_insert_ordered (&cond->waiters, &waiter.elem, prio_cond_func, NULL);
+  // list_push_back (&cond->waiters, &waiter.elem);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
+}
+
+bool prio_cond_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct semaphore_elem *aT = list_entry (a, struct semaphore_elem, elem);
+  struct semaphore_elem *bT = list_entry (b, struct semaphore_elem, elem);
+  return aT->priority > bT->priority;
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
