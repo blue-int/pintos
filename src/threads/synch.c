@@ -295,7 +295,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
-    int priority;
+    int priority;                       /* Current Priority */
   };
 
 /* Initializes condition variable COND.  A condition variable
@@ -347,7 +347,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   lock_acquire (lock);
 }
 
-bool prio_cond_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+bool prio_cond_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
   struct semaphore_elem *aT = list_entry (a, struct semaphore_elem, elem);
   struct semaphore_elem *bT = list_entry (b, struct semaphore_elem, elem);
   return aT->priority > bT->priority;
