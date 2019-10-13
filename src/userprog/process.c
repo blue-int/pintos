@@ -20,11 +20,19 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
+void parse_cmdname (char *dest, char *src);
+void stack_create (char *file_name, void **esp);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
+void
+parse_cmdname (char *dest, char *src) {
+  char *save;
+  strlcpy (dest, src, PGSIZE);
+  dest = strtok_r (dest, " ", &save);
+}
+
 tid_t
 process_execute (const char *file_name) 
 {
@@ -38,11 +46,74 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  char cmd_name[256];
+  parse_cmdname (cmd_name, fn_copy);
+  printf ("cmd_name: %s\n", cmd_name);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (cmd_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
+}
+
+void
+stack_create (char *file_name, void **esp) {
+  char file_copy[128];
+  char *save;
+  char *token;
+  int argc = 0;
+  int len_total = 0;
+  uint32_t *addr[128];
+  char* argv[128];
+  strlcpy (file_copy, file_name, PGSIZE);
+
+  // argv에 args token pointer 저장, argc, len_total 계산
+  do {
+    if (argc == 0)
+      token = strtok_r (file_copy, " ", &save);
+    else
+      token = strtok_r (NULL, " ", &save);
+    if (token) {
+      argv[argc] = token;
+      argc++;
+      len_total += strlen (token) + 1;
+    }
+  } while (token);
+
+  // addr[0]이 가장 마지막 arg, addr[argc-1]이 가장 첫번째 arg
+  for (int i = 0; i < argc; i++) {
+    *esp -= strlen (argv[argc - i - 1]) + 1;
+    strlcpy (*esp, argv[argc - i - 1], strlen (argv[argc - i - 1]) + 1);
+    addr[i] = (uint32_t *)*esp;
+  }
+
+  // word-align
+  *esp -= len_total % 4;
+
+  // null
+  *esp -= 4;
+  **(int **)esp = 0;
+
+  // addr[0]이 가장 마지막 arg, addr[argc-1]이 가장 첫번째 arg
+  for (int i = 0; i < argc; i++) {
+    *esp -= 4;
+    *(uint32_t **)*esp = addr[i];
+  }
+
+  // argv
+  *esp -= 4;
+  *(uint32_t **)*esp = *esp + 4;
+
+  // argc
+  *esp -= 4;
+  **(int **)esp = argc;
+
+  // return address
+  *esp -= 4;
+  **(int **)esp = 0;
+
+  hex_dump ((uintptr_t)*esp, *esp, 0xc0000000 - (uintptr_t)*esp, true);
 }
 
 /* A thread function that loads a user process and starts it
@@ -53,13 +124,17 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  char cmd_name[256];
+  parse_cmdname (cmd_name, file_name);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (cmd_name, &if_.eip, &if_.esp);
+  if (success)
+    stack_create (file_name, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -88,6 +163,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  while (true);
   return -1;
 }
 
@@ -114,6 +190,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  printf ("%s: exit(%d)\n", cur->name, 1);
 }
 
 /* Sets up the CPU for running user code in the current
