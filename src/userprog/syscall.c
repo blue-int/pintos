@@ -173,12 +173,15 @@ int read (int fd, void *buffer, unsigned size) {
 }
 
 int write (int fd, const void *buffer, unsigned size) {
+  check_valid_addr (buffer);
   struct thread *cur = thread_current ();
   if (fd == 1 && size <= 512) {
     putbuf(buffer, size);
     return size;
-  } else if (fd > 2 && fd < 128)
-    return file_write (cur->fd[fd], buffer, size);
+  } else if (fd > 1 && fd < 128) {
+    struct file *fp = cur->fd[fd];
+    if (fp)
+      return file_write (fp, buffer, size);
+  }
   return -1;
 }
-
