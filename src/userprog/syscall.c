@@ -77,6 +77,7 @@ syscall_handler (struct intr_frame *f)
 
   case SYS_OPEN: // 1
     check_valid_addr (arg0);
+    f->eax = open ((const char *)*arg0);
     break;
 
   case SYS_FILESIZE: // 1
@@ -129,6 +130,21 @@ void exit (int status) {
 bool create (const char *file, unsigned initial_size) {
   check_valid_addr (file);
   return filesys_create (file, (off_t)initial_size);
+};
+
+int open (const char *file) {
+  check_valid_addr (file);
+  struct file* fp = filesys_open (file);
+  struct thread *cur = thread_current ();
+  if (fp) {
+    for (int i = 2; i < 128; i++) {
+      if (!(cur->fd[i])) {
+        cur->fd[i] = fp;
+        return i;
+      }
+    }
+  }
+  return -1;
 };
 
 int read (int fd, void *buffer UNUSED, unsigned size) {

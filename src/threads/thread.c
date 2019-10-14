@@ -526,6 +526,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->wakeup_tick = -1;
   t->host_lock = NULL;
+#ifdef USERPROG
+  for (int i = 0; i < 128; i++)
+    t->fd[i] = NULL;
+#endif
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
