@@ -48,7 +48,6 @@ process_execute (const char *file_name)
 
   char cmd_name[256];
   parse_cmdname (cmd_name, fn_copy);
-  printf ("cmd_name: %s\n", cmd_name);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, fn_copy);
@@ -69,16 +68,12 @@ stack_create (char *file_name, void **esp) {
   strlcpy (file_copy, file_name, PGSIZE);
 
   // argv에 args token pointer 저장, argc, len_total 계산
+  token = strtok_r (file_copy, " ", &save);
   do {
-    if (argc == 0)
-      token = strtok_r (file_copy, " ", &save);
-    else
-      token = strtok_r (NULL, " ", &save);
-    if (token) {
-      argv[argc] = token;
-      argc++;
-      len_total += strlen (token) + 1;
-    }
+    argv[argc] = token;
+    argc++;
+    len_total += strlen (token) + 1;
+    token = strtok_r (NULL, " ", &save);
   } while (token);
 
   // addr[0]이 가장 마지막 arg, addr[argc-1]이 가장 첫번째 arg
@@ -113,7 +108,7 @@ stack_create (char *file_name, void **esp) {
   *esp -= 4;
   **(int **)esp = 0;
 
-  hex_dump ((uintptr_t)*esp, *esp, 0xc0000000 - (uintptr_t)*esp, true);
+  // hex_dump ((uintptr_t)*esp, *esp, 0xc0000000 - (uintptr_t)*esp, true);
 }
 
 /* A thread function that loads a user process and starts it
@@ -163,7 +158,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while (true);
+  int i = 0;
+  while (10000000 > i)
+    i++;
   return -1;
 }
 
@@ -190,7 +187,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  printf ("%s: exit(%d)\n", cur->name, 1);
 }
 
 /* Sets up the CPU for running user code in the current
