@@ -8,6 +8,7 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 
 static void syscall_handler (struct intr_frame *);
 void check_valid_addr (const void *vaddr);
@@ -55,7 +56,7 @@ syscall_handler (struct intr_frame *f)
   
   case SYS_EXIT: // 1
     check_valid_addr (arg0);
-    exit (*(int *)(f->esp + 4));
+    exit ((int)*arg0);
     break;
   
   case SYS_EXEC: // 1
@@ -82,6 +83,7 @@ syscall_handler (struct intr_frame *f)
 
   case SYS_FILESIZE: // 1
     check_valid_addr (arg0);
+    f->eax = filesize ((int)*arg0);
     break;
 
   case SYS_READ: // 3
@@ -129,12 +131,12 @@ void exit (int status) {
 
 bool create (const char *file, unsigned initial_size) {
   check_valid_addr (file);
-  return filesys_create (file, (off_t)initial_size);
+  return filesys_create (file, initial_size);
 };
 
 int open (const char *file) {
   check_valid_addr (file);
-  struct file* fp = filesys_open (file);
+  struct file *fp = filesys_open (file);
   struct thread *cur = thread_current ();
   if (fp) {
     for (int i = 2; i < 128; i++) {
@@ -147,20 +149,36 @@ int open (const char *file) {
   return -1;
 };
 
-int read (int fd, void *buffer UNUSED, unsigned size) {
+int filesize (int fd) {
+  return file_length (thread_current ()->fd[fd]);
+};
+
+int read (int fd, void *buffer, unsigned size) {
+  check_valid_addr (buffer);
+  struct thread *cur = thread_current ();
+  int len;
   if (fd == 0) {
-    // size should be the actual size read
     input_getc ();
     return size;
+  } else if (fd > 1 && fd < 128) {
+    struct file* fp = cur->fd[fd];
+    if (fp) {
+      len = file_length (fp);
+      file_seek (fp ,0);
+      len = file_read (fp, buffer, size);
+      return len;
+    }
   }
-  else return -1;
+  return -1;
 }
 
 int write (int fd, const void *buffer, unsigned size) {
+  struct thread *cur = thread_current ();
   if (fd == 1 && size <= 512) {
-    // size should be the actual size written
     putbuf(buffer, size);
     return size;
-  } else return -1;
+  } else if (fd > 2 && fd < 128)
+    return file_write (cur->fd[fd], buffer, size);
+  return -1;
 }
 
