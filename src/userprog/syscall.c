@@ -78,7 +78,7 @@ syscall_handler (struct intr_frame *f)
   
   case SYS_REMOVE: // 1
     check_valid_addr (arg0);
-    printf ("remove\n");
+    f->eax = remove ((const char *)*arg0);
     break;
 
   case SYS_OPEN: // 1
@@ -108,7 +108,7 @@ syscall_handler (struct intr_frame *f)
 
   case SYS_TELL: // 1
     check_valid_addr (arg0);
-    printf ("tell\n");
+    f->eax = tell ((int)*arg0);
     break;
 
   case SYS_CLOSE: // 1
@@ -151,6 +151,11 @@ int wait (pid_t pid) {
 bool create (const char *file, unsigned initial_size) {
   check_valid_addr (file);
   return filesys_create (file, initial_size);
+}
+
+bool remove (const char *file) {
+  check_valid_addr (file);
+  return filesys_remove (file);
 }
 
 int open (const char *file) {
@@ -216,10 +221,15 @@ void seek (int fd, unsigned position) {
   }
 }
 
+unsigned tell (int fd) {
+  return file_tell (thread_current ()->fd[fd]);
+}
+
 void close (int fd) {
   struct thread *cur = thread_current ();
   if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
+    cur->fd[fd] = NULL;
     if (fp)
       file_close (fp);
   }
