@@ -78,6 +78,7 @@ syscall_handler (struct intr_frame *f)
   
   case SYS_REMOVE: // 1
     check_valid_addr (arg0);
+    printf ("remove\n");
     break;
 
   case SYS_OPEN: // 1
@@ -102,14 +103,17 @@ syscall_handler (struct intr_frame *f)
 
   case SYS_SEEK: // 2
     check_valid_addr (arg1);
+    seek ((int)*arg0, (unsigned)*arg1);
     break;
 
   case SYS_TELL: // 1
     check_valid_addr (arg0);
+    printf ("tell\n");
     break;
 
   case SYS_CLOSE: // 1
     check_valid_addr (arg0);
+    close ((int)*arg0);
     break;
   
   default:
@@ -156,6 +160,8 @@ int open (const char *file) {
   if (fp) {
     for (int i = 2; i < 128; i++) {
       if (!(cur->fd[i])) {
+        if (strcmp (thread_name (), file) == 0)
+          file_deny_write (fp);
         cur->fd[i] = fp;
         return i;
       }
@@ -199,4 +205,22 @@ int write (int fd, const void *buffer, unsigned size) {
       return file_write (fp, buffer, size);
   }
   return -1;
+}
+
+void seek (int fd, unsigned position) {
+  struct thread *cur = thread_current ();
+  if (fd > 1 && fd < 128) {
+    struct file *fp = cur->fd[fd];
+    if (fp)
+      file_seek (fp, position);
+  }
+}
+
+void close (int fd) {
+  struct thread *cur = thread_current ();
+  if (fd > 1 && fd < 128) {
+    struct file *fp = cur->fd[fd];
+    if (fp)
+      file_close (fp);
+  }
 }

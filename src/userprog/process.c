@@ -51,8 +51,12 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, fn_copy);
+  struct thread *cur = thread_current ();
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+  sema_down (&(cur->load_sema));
+  if (cur->exit_status == -1)
+    return -1;
   return tid;
 }
 
@@ -130,12 +134,14 @@ start_process (void *file_name_)
   success = load (cmd_name, &if_.eip, &if_.esp);
   if (success)
     stack_create (file_name, &if_.esp);
+  else
+    thread_current ()->parent->exit_status = -1;
+  sema_up (&(thread_current ()->parent->load_sema));
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
     thread_current ()->exit_status = -1;
     thread_exit ();
-    // exit (-1);
   }
 
   /* Start the user process by simulating a return from an
