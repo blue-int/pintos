@@ -130,11 +130,13 @@ start_process (void *file_name_)
   success = load (cmd_name, &if_.eip, &if_.esp);
   if (success)
     stack_create (file_name, &if_.esp);
-
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success) {
+    thread_current ()->exit_status = -1;
     thread_exit ();
+    // exit (-1);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -156,11 +158,22 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  int i = 0;
-  while (10000000 > i)
-    i++;
+  struct thread *cur = thread_current ();
+  struct list *child_list = &(cur->child_list);
+  struct list_elem *e;
+  for (e = list_begin (child_list); e != list_end (child_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, child_elem);
+      if (t->tid == child_tid) {
+        sema_down (&t->child_sema);
+        list_remove (&(t->child_elem));
+        sema_up (&t->exit_sema);
+        return t->exit_status;
+      }
+    }
   return -1;
 }
 
@@ -170,6 +183,9 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  sema_up (&(cur->child_sema));
+  sema_down (&(cur->exit_sema));
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

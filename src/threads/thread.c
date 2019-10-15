@@ -529,6 +529,14 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
   for (int i = 0; i < 128; i++)
     t->fd[i] = NULL;
+  
+  struct thread *cur = running_thread ();
+  t->parent = cur;
+  list_init (&(t->child_list));
+  sema_init (&(t->child_sema), 0);
+  sema_init (&(t->exit_sema), 0);
+  list_push_back (&(cur->child_list), &(t->child_elem));
+  t->exit_status = NULL;
 #endif
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

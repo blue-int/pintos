@@ -1,7 +1,9 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -61,10 +63,12 @@ syscall_handler (struct intr_frame *f)
   
   case SYS_EXEC: // 1
     check_valid_addr (arg0);
+    f->eax = exec ((const char *)*arg0);
     break;
   
   case SYS_WAIT: // 1
     check_valid_addr (arg0);
+    f->eax = wait ((pid_t)*arg0);
     break;
   
   case SYS_CREATE: // 2
@@ -122,17 +126,28 @@ void check_valid_addr (const void *vaddr) {
 
 void halt (void) {
   shutdown_power_off ();
-};
+}
 
 void exit (int status) {
   printf ("%s: exit(%d)\n", thread_name (), status);
+  thread_current ()->exit_status = status;
   thread_exit ();
+}
+
+pid_t exec (const char *cmd_line) {
+  check_valid_addr (cmd_line);
+  return process_execute (cmd_line);
+}
+
+int wait (pid_t pid) {
+  pid_t child = process_wait (pid);
+  return child;
 }
 
 bool create (const char *file, unsigned initial_size) {
   check_valid_addr (file);
   return filesys_create (file, initial_size);
-};
+}
 
 int open (const char *file) {
   check_valid_addr (file);
@@ -147,11 +162,11 @@ int open (const char *file) {
     }
   }
   return -1;
-};
+}
 
 int filesize (int fd) {
   return file_length (thread_current ()->fd[fd]);
-};
+}
 
 int read (int fd, void *buffer, unsigned size) {
   check_valid_addr (buffer);
