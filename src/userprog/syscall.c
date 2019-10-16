@@ -23,7 +23,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  // hex_dump ((uintptr_t)f->esp, f->esp, 0xc0000000 - (uintptr_t)f->esp, true);
   uint32_t *esp = (uint32_t *)(f->esp);
   check_valid_addr (esp);
   check_valid_addr (esp + 1);
@@ -31,7 +30,6 @@ syscall_handler (struct intr_frame *f)
   uint32_t *arg0 = (uint32_t *)(f->esp + 4);
   uint32_t *arg1 = (uint32_t *)(f->esp + 8);
   uint32_t *arg2 = (uint32_t *)(f->esp + 12);
-  // printf ("system call %d!\n", sysnum);
 
   switch (sysnum)
   {
@@ -106,8 +104,6 @@ syscall_handler (struct intr_frame *f)
   default:
     break;
   }
-
-  // thread_exit ();
 }
 
 void check_valid_addr (const void *vaddr) {
@@ -150,6 +146,7 @@ bool remove (const char *file) {
 
 int open (const char *file) {
   check_valid_addr (file);
+  lock_acquire (&filesys_lock);
   struct file *fp = filesys_open (file);
   struct thread *cur = thread_current ();
   if (fp) {
@@ -158,10 +155,12 @@ int open (const char *file) {
         if (strcmp (thread_name (), file) == 0)
           file_deny_write (fp);
         cur->fd[i] = fp;
+        lock_release (&filesys_lock);
         return i;
       }
     }
   }
+  lock_release (&filesys_lock);
   return -1;
 }
 
@@ -177,13 +176,16 @@ int read (int fd, void *buffer, unsigned size) {
     input_getc ();
     return size;
   } else if (fd > 1 && fd < 128) {
+    lock_acquire (&filesys_lock);
     struct file* fp = cur->fd[fd];
     if (fp) {
       len = file_length (fp);
-      file_seek (fp ,0);
       len = file_read (fp, buffer, size);
+      
+      lock_release (&filesys_lock);
       return len;
     }
+    lock_release (&filesys_lock);
   }
   return -1;
 }
@@ -196,8 +198,9 @@ int write (int fd, const void *buffer, unsigned size) {
     return size;
   } else if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
-    if (fp)
+    if (fp) {
       return file_write (fp, buffer, size);
+    }
   }
   return -1;
 }
@@ -216,6 +219,7 @@ unsigned tell (int fd) {
 }
 
 void close (int fd) {
+  lock_acquire (&filesys_lock);
   struct thread *cur = thread_current ();
   if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
@@ -223,4 +227,5 @@ void close (int fd) {
     if (fp)
       file_close (fp);
   }
+  lock_release (&filesys_lock);
 }

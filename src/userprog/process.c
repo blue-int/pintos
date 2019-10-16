@@ -112,8 +112,6 @@ stack_create (char *file_name, void **esp) {
   // return address
   *esp -= 4;
   **(int **)esp = 0;
-
-  // hex_dump ((uintptr_t)*esp, *esp, 0xc0000000 - (uintptr_t)*esp, true);
 }
 
 /* A thread function that loads a user process and starts it
