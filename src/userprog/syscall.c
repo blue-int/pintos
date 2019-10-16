@@ -44,6 +44,7 @@ syscall_handler (struct intr_frame *f)
   // hex_dump ((uintptr_t)f->esp, f->esp, 0xc0000000 - (uintptr_t)f->esp, true);
   uint32_t *esp = (uint32_t *)(f->esp);
   check_valid_addr (esp);
+  check_valid_addr (esp + 1);
   int sysnum = *(int *)f->esp;
   uint32_t *arg0 = (uint32_t *)(f->esp + 4);
   uint32_t *arg1 = (uint32_t *)(f->esp + 8);
@@ -63,7 +64,11 @@ syscall_handler (struct intr_frame *f)
   
   case SYS_EXEC: // 1
     check_valid_addr (arg0);
-    f->eax = exec ((const char *)*arg0);
+    char *p = f->esp + 4;
+    check_valid_addr (p);
+    while (*p != '\0')
+      check_valid_addr (++p);
+    f->eax = exec (*(const char **)(f->esp + 4));
     break;
   
   case SYS_WAIT: // 1
@@ -139,7 +144,10 @@ void exit (int status) {
 }
 
 pid_t exec (const char *cmd_line) {
-  check_valid_addr (cmd_line);
+  const char *p = cmd_line;
+  check_valid_addr (p);
+  while (*p != '\0')
+    check_valid_addr (++p);
   return process_execute (cmd_line);
 }
 
