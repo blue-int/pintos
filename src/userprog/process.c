@@ -175,8 +175,9 @@ process_wait (tid_t child_tid)
       if (t->tid == child_tid) {
         sema_down (&t->child_sema);
         list_remove (&(t->child_elem));
+        int exit_status = t->exit_status;
         sema_up (&t->exit_sema);
-        return t->exit_status;
+        return exit_status;
       }
     }
   return -1;
