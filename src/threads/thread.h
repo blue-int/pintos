@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 #include "synch.h"
+#include <hash.h>
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -94,8 +96,8 @@ struct thread
     struct lock* host_lock;
     struct list_elem allelem;           /* List element for all threads list. */
 
-    struct list_elem sleep_elem;           /* List element for sleep_list. */
-    int64_t wakeup_tick;               /* wakeup tick to get rid of busy waiting */
+    struct list_elem sleep_elem;        /* List element for sleep_list. */
+    int64_t wakeup_tick;                /* wakeup tick to get rid of busy waiting */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -111,6 +113,10 @@ struct thread
     struct semaphore load_sema;
     struct semaphore exit_sema;
     int exit_status;
+#endif
+
+#ifdef VM
+    struct hash spt;                    /* Supplemental Page Table */
 #endif
 
     /* Owned by thread.c. */

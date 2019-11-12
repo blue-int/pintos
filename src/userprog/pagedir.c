@@ -5,6 +5,7 @@
 #include "threads/init.h"
 #include "threads/pte.h"
 #include "threads/palloc.h"
+#include "vm/page.h"
 
 static uint32_t *active_pd (void);
 static void invalidate_pagedir (uint32_t *);
@@ -45,6 +46,7 @@ pagedir_destroy (uint32_t *pd)
         palloc_free_page (pt);
       }
   palloc_free_page (pd);
+  spt_destroy ();
 }
 
 /* Returns the address of the page table entry for virtual
@@ -112,6 +114,7 @@ pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool writable)
     {
       ASSERT ((*pte & PTE_P) == 0);
       *pte = pte_create_user (kpage, writable);
+      spt_insert (upage);
       return true;
     }
   else
