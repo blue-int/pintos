@@ -3,6 +3,9 @@
 
 #include <hash.h>
 #include <debug.h>
+#include "threads/thread.h"
+#include "threads/malloc.h"
+#include "vm/frame.h"
 
 struct spte {
   struct hash_elem hash_elem;
@@ -13,7 +16,7 @@ void spt_init (struct hash *spt);
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED);
 bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
 void spt_insert (void *vaddr, void *paddr);
-void spt_delete (void *vaddr);
+void spt_delete (struct fte *fte);
 void spt_destroy (void);
 
 #endif

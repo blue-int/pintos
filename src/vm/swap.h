@@ -1,5 +1,10 @@
 #ifndef VM_SWAP_H
 #define VM_SWAP_H
+
+#include <hash.h>
+#include "devices/block.h"
+#include "threads/malloc.h"
+#include "threads/vaddr.h"
 #include "vm/frame.h"
 
 struct ste {

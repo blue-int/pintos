@@ -1,12 +1,6 @@
-#include <hash.h>
-#include "threads/malloc.h"
 #include "threads/thread.h"
-#include "threads/vaddr.h"
-#include "threads/palloc.h"
-#include "userprog/pagedir.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
-#include <stdio.h>
 
 static struct hash ft_hash;
 static struct list ft_list;
@@ -18,7 +12,7 @@ void ft_init (void) {
   list_init (&ft_list);
 }
 
-void * ft_allocate (void) {
+void *ft_allocate (void) {
   void *kpage = palloc_get_page (PAL_USER);
   if (kpage == NULL) {
     // Find victim frame and SWAP_OUT
@@ -30,21 +24,19 @@ void * ft_allocate (void) {
 }
 
 void ft_evict (void) {
-  printf("theeeeeeeeeeeeeeeeeeeeeeeere\n");
   struct list_elem *e;
   for (e = list_begin (&ft_list); e != list_end (&ft_list);
        e = list_next (e))
     {
       struct fte *fte = list_entry (e, struct fte, list_elem);
       struct thread *cur = thread_current ();
-      printf("%s thread is running\n", cur->name);
       bool chance = pagedir_is_accessed (cur->pagedir, fte->vaddr);
       if (chance) {
         pagedir_set_accessed (cur->pagedir, fte->vaddr, false);
       } else {
         if (swap_out (fte)) {
+          spt_delete (fte);
           ft_delete (fte);
-          spt_delete (fte->vaddr);
           break;
         }
         else
@@ -56,6 +48,7 @@ void ft_evict (void) {
 void ft_insert (void *paddr) {
   struct fte *fte = (struct fte *) malloc (sizeof (struct fte));
   fte->paddr = paddr;
+  fte->t = thread_current ();
   hash_insert (&ft_hash, &fte->hash_elem);
   list_push_back (&ft_list, &fte->list_elem);
 }
