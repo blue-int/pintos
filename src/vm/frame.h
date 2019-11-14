@@ -3,17 +3,21 @@
 
 #include <hash.h>
 #include <debug.h>
+#include "threads/palloc.h"
 
 struct fte {
   struct hash_elem hash_elem;
-  void* pa;
+  struct list_elem list_elem;
+  void *paddr;
+  void *vaddr;
 };
 
-void ft_init (struct hash *ft);
-unsigned ft_hash_func (const struct hash_elem *e, void *aux UNUSED);
-bool ft_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
-void ft_insert (void *vaddr);
-void ft_delete (void *vaddr);
+void ft_init (void);
+void * ft_allocate (void);
+void ft_evict (void);
+void ft_insert (void *paddr);
+void ft_add_vaddr (void *vaddr, void *paddr);
+void ft_delete (struct fte * fte);
 void ft_destroy (void);
 
 #endif
