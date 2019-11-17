@@ -160,12 +160,15 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-  if (not_present && swap_check (fault_addr)) {
-    swap_in (fault_addr);
+  struct hash *spt = &thread_current() -> spt;
+  if (not_present && swap_check (spt, fault_addr)) {
+    swap_in (spt, fault_addr);
     return;
   }
-  if (not_present || user)
+  if (not_present || user){
+    // printf("It's not present: %d, or its user : %d\n", not_present, user);
     exit (-1);
+  }
 
   kill (f);
 }

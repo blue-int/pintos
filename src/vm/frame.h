@@ -6,7 +6,10 @@
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "threads/palloc.h"
+#include "threads/synch.h"
 #include "userprog/pagedir.h"
+
+struct lock ft_lock;
 
 struct fte {
   struct hash_elem hash_elem;

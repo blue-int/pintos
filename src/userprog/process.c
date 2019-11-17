@@ -210,7 +210,7 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-      spt_destroy ();
+      spt_destroy (&cur->spt);
     }
 }
 
@@ -533,8 +533,8 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  // kpage = ft_allocate (PAL_USER | PAL_ZERO);
+  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = ft_allocate (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -565,6 +565,6 @@ install_page (void *upage, void *kpage, bool writable)
   bool success = pagedir_get_page (t->pagedir, upage) == NULL
               && pagedir_set_page (t->pagedir, upage, kpage, writable);
   if (success)
-    spt_insert (upage, kpage);
+    ft_add_vaddr (upage, kpage);
   return success;
 }

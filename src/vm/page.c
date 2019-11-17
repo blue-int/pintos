@@ -23,17 +23,16 @@ void spt_insert (void *vaddr, void *paddr) {
   ft_add_vaddr (vaddr, paddr);
 }
 
-void spt_delete (struct fte *fte) {
+void spt_delete (struct hash *spt, void *vaddr) {
   struct spte p;
-  p.vaddr = fte->vaddr;
-  struct hash_elem *e = hash_delete (&fte->t->spt, &p.hash_elem);
+  p.vaddr = vaddr;
+  struct hash_elem *e = hash_delete (spt, &p.hash_elem);
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
   free (spte);
 }
 
-void spt_destroy (void) {
-  struct thread *cur = thread_current ();
-  if (&cur->spt != NULL) {
-    hash_destroy (&cur->spt, NULL);
+void spt_destroy (struct hash *spt) {
+  if (spt != NULL) {
+    hash_destroy (spt, NULL);
   }
 }
