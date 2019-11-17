@@ -39,16 +39,25 @@ void ft_evict (void) {
       struct thread *cur = thread_current ();
       printf("%s thread is running\n", cur->name);
       bool chance = pagedir_is_accessed (cur->pagedir, fte->vaddr);
-      if (chance) {
+      printf("test point 1\n");
+      if (chance) 
+      {
+        printf("test point 2\n");
         pagedir_set_accessed (cur->pagedir, fte->vaddr, false);
-      } else {
+      } 
+      else 
+      { 
+        printf("test point 3\n");
         if (swap_out (fte)) {
-          ft_delete (fte);
-          spt_delete (fte->vaddr);
+          printf("test point 4\n");
+          // ft_delete (fte);
+          // spt_delete (fte->vaddr);
           break;
         }
-        else
+        else{
+          printf("test point 5\n");
           PANIC ("not enough swap slots");
+        }
       }
     }
 }

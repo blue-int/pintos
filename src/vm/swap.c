@@ -13,8 +13,8 @@ void swap_init (void) {
 
 bool swap_out (struct fte * fte) {
   struct block *swap_block = block_get_role (BLOCK_SWAP);
-  printf("hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii\n");
-  block_write (swap_block, 1, fte->vaddr);
+  // printf("hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii\n");
+  // block_write (swap_block, 1, fte->vaddr);
   return true;
 }
 
