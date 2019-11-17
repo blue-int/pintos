@@ -17,7 +17,7 @@ struct fte {
 };
 
 void ft_init (void);
-void * ft_allocate (void);
+void * ft_allocate (enum palloc_flags flags);
 void ft_evict (void);
 void ft_insert (void *paddr);
 void ft_add_vaddr (void *vaddr, void *paddr);

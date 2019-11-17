@@ -1,6 +1,7 @@
 #include "threads/thread.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include <stdio.h>
 
 static struct hash ft_hash;
 static struct list ft_list;
@@ -12,12 +13,12 @@ void ft_init (void) {
   list_init (&ft_list);
 }
 
-void *ft_allocate (void) {
-  void *kpage = palloc_get_page (PAL_USER);
+void * ft_allocate (enum palloc_flags flags) {
+  void *kpage = palloc_get_page (flags);
   if (kpage == NULL) {
     // Find victim frame and SWAP_OUT
     ft_evict ();
-    kpage = palloc_get_page (PAL_USER);
+    kpage = palloc_get_page (flags);
   }
   ft_insert (kpage);
   return kpage;
@@ -29,12 +30,14 @@ void ft_evict (void) {
        e = list_next (e))
     {
       struct fte *fte = list_entry (e, struct fte, list_elem);
-      struct thread *cur = thread_current ();
-      bool chance = pagedir_is_accessed (cur->pagedir, fte->vaddr);
-      if (chance) {
-        pagedir_set_accessed (cur->pagedir, fte->vaddr, false);
+      uint32_t *pd = fte->t->pagedir;
+      void *vaddr = fte->vaddr;
+      if (pagedir_is_accessed (pd, vaddr)) {
+        pagedir_set_accessed (pd, vaddr, false);
       } else {
         if (swap_out (fte)) {
+          pagedir_clear_page (pd, vaddr);
+          palloc_free_page (fte->paddr);
           spt_delete (fte);
           ft_delete (fte);
           break;

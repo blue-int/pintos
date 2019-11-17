@@ -6,7 +6,7 @@
 #include "threads/thread.h"
 #include "userprog/syscall.h"
 #ifdef VM
-#include "vm/page.h"
+#include "vm/swap.h"
 #endif
 
 /* Number of page faults processed. */
@@ -160,6 +160,10 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
+  if (not_present && swap_check (fault_addr)) {
+    swap_in (fault_addr);
+    return;
+  }
   if (not_present || user)
     exit (-1);
 
