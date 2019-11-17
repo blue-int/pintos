@@ -9,10 +9,14 @@
 
 struct ste {
   void * vaddr;
+  block_sector_t block_index;
+  struct hash_elem hash_elem;
 };
 
 void swap_init (void);
 bool swap_out (struct fte * fte);
 void swap_in (void *vaddr);
+bool swap_check (void *vaddr);
+void swap_insert (void *vaddr, block_sector_t block_index);
 
 #endif
