@@ -1,7 +1,4 @@
-#include <hash.h>
-#include <stdio.h>
 #include "vm/swap.h"
-#include "devices/block.h"
 
 static struct hash swap_table;
 static unsigned swap_hash_func (const struct hash_elem *e, void *aux UNUSED);
@@ -13,8 +10,8 @@ void swap_init (void) {
 
 bool swap_out (struct fte * fte) {
   struct block *swap_block = block_get_role (BLOCK_SWAP);
-  // printf("hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii\n");
-  // block_write (swap_block, 1, fte->vaddr);
+  // index should be added to swap table
+  block_write (swap_block, 0, fte->paddr);
   return true;
 }
 

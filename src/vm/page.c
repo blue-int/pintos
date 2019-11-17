@@ -1,7 +1,4 @@
-#include <hash.h>
-#include "threads/thread.h"
 #include "vm/page.h"
-#include "vm/frame.h"
 
 void spt_init (struct hash *spt) {
   hash_init (spt, spt_hash_func, spt_less_func, NULL);
@@ -20,17 +17,18 @@ bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *
 
 void spt_insert (void *vaddr, void *paddr) {
   struct thread *cur = thread_current ();
-  struct spte spte;
-  spte.vaddr = vaddr;
-  hash_insert (&cur->spt, &spte.hash_elem);
+  struct spte *spte = (struct spte *) malloc (sizeof(struct spte));
+  spte->vaddr = vaddr;
+  hash_insert (&cur->spt, &spte->hash_elem);
   ft_add_vaddr (vaddr, paddr);
 }
 
-void spt_delete (void *vaddr) {
-  struct thread *cur = thread_current ();
-  struct spte spte;
-  spte.vaddr = vaddr;
-  hash_delete (&cur->spt, &spte.hash_elem);
+void spt_delete (struct fte *fte) {
+  struct spte p;
+  p.vaddr = fte->vaddr;
+  struct hash_elem *e = hash_delete (&fte->t->spt, &p.hash_elem);
+  struct spte *spte = hash_entry (e, struct spte, hash_elem);
+  free (spte);
 }
 
 void spt_destroy (void) {

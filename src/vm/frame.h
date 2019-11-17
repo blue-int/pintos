@@ -3,13 +3,17 @@
 
 #include <hash.h>
 #include <debug.h>
+#include "threads/malloc.h"
+#include "threads/vaddr.h"
 #include "threads/palloc.h"
+#include "userprog/pagedir.h"
 
 struct fte {
   struct hash_elem hash_elem;
   struct list_elem list_elem;
   void *paddr;
   void *vaddr;
+  struct thread *t;
 };
 
 void ft_init (void);
