@@ -10,6 +10,7 @@
 #include "userprog/pagedir.h"
 
 struct lock ft_lock;
+struct lock alloc_lock;
 
 struct fte {
   struct hash_elem hash_elem;
@@ -25,6 +26,7 @@ void ft_evict (void);
 void ft_insert (void *paddr);
 void ft_add_vaddr (void *vaddr, void *paddr);
 void ft_delete (struct fte * fte);
+void fte_remove (struct hash_elem *e, void *aux UNUSED);
 void ft_destroy (void);
 
 #endif

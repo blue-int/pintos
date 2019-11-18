@@ -12,15 +12,18 @@ void ft_init (void) {
   hash_init (&ft_hash, ft_hash_func, ft_less_func, NULL);
   list_init (&ft_list);
   lock_init (&ft_lock);
+  lock_init (&alloc_lock);
 }
 
 void * ft_allocate (enum palloc_flags flags) {
+  lock_acquire (&alloc_lock);
   void *kpage = palloc_get_page (flags);
   if (kpage == NULL) {
     ft_evict ();
     kpage = palloc_get_page (flags);
   }
   ft_insert (kpage);
+  lock_release (&alloc_lock);
   return kpage;
 }
 
@@ -33,16 +36,16 @@ void ft_evict (void) {
       uint32_t *pd = fte->t->pagedir;
       struct hash *spt = &fte->t->spt;
       void *vaddr = fte->vaddr;
-      // printf ("vaddr %p\n", vaddr);
+      // printf ("%p evict candidate\n", vaddr);
       if (vaddr == NULL) {
-        // printf ("NULL\n");
+        printf ("NULL\n");
         continue;
       }
       if (pagedir_is_accessed (pd, vaddr)) {
         pagedir_set_accessed (pd, vaddr, false);
       } 
       else {
-        // printf ("evicted vaddr: %p\n", vaddr);
+        // printf ("%p evicted vaddr\n", vaddr);
         if (swap_out (spt, fte)) {
           pagedir_clear_page (pd, vaddr);
           palloc_free_page (fte->paddr);
@@ -58,15 +61,18 @@ void ft_evict (void) {
 }
 
 void ft_insert (void *paddr) {
+  lock_acquire (&ft_lock);
   struct fte *fte = (struct fte *) malloc (sizeof (struct fte));
   fte->paddr = paddr;
   fte->vaddr = NULL;
   fte->t = thread_current ();
   hash_insert (&ft_hash, &fte->hash_elem);
   list_push_back (&ft_list, &fte->list_elem);
+  lock_release (&ft_lock);
 }
 
 void ft_add_vaddr (void *vaddr, void *paddr) {
+  lock_acquire (&ft_lock);
   struct fte sample;
   sample.paddr = paddr;
   struct hash_elem *e = hash_find (&ft_hash, &sample.hash_elem);
@@ -76,15 +82,35 @@ void ft_add_vaddr (void *vaddr, void *paddr) {
   }
   struct fte *fte = hash_entry (e, struct fte, hash_elem);
   fte->vaddr = vaddr;
+  lock_release (&ft_lock);
 }
 
-void ft_delete (struct fte * fte) {
+void ft_delete (struct fte *fte) {
+  lock_acquire (&ft_lock);
   hash_delete (&ft_hash, &fte->hash_elem);
   list_remove (&fte->list_elem);
+  free (fte);
+  lock_release (&ft_lock);
+}
+
+void fte_remove (struct hash_elem *e, void *aux UNUSED) {
+  lock_acquire (&ft_lock);
+  struct spte *spte = hash_entry (e, struct spte, hash_elem);
+  struct fte sample;
+  sample.paddr = spte->paddr;
+  struct hash_elem *elem = hash_delete (&ft_hash, &sample.hash_elem);
+  struct fte *fte = hash_entry (elem, struct fte, hash_elem);
+  list_remove (&fte->list_elem);
+  swap_remove (spte->block_index);
+  free (spte);
+  free (fte);
+  lock_release (&ft_lock);
 }
 
 void ft_destroy (void) {
+  lock_acquire (&ft_lock);
   hash_destroy (&ft_hash, NULL);
+  lock_release (&ft_lock);
 }
 
 static unsigned ft_hash_func (const struct hash_elem *e, void *aux UNUSED) {

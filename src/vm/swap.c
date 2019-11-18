@@ -29,25 +29,33 @@ bool swap_check (struct hash *spt, void *vaddr) {
 }
 
 void swap_in (struct hash *spt, void *_vaddr) {
+  // printf ("swap_in\n");
   struct spte sample;
   void *vaddr = pg_round_down(_vaddr);
   sample.vaddr = vaddr;
+  // printf ("swap_in vaddr: %p\n", vaddr);
   struct hash_elem *e = hash_find (spt, &sample.hash_elem);
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
 
   struct block *swap_block = block_get_role (BLOCK_SWAP);
   uint8_t *kpage = ft_allocate (PAL_USER);
+  // printf ("swap_in kpage: %p\n", kpage);
   bitmap_scan_and_flip (slot_list, spte->block_index, PGSIZE / BLOCK_SECTOR_SIZE, true);
   for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_read (swap_block, (spte->block_index) + i, kpage + (i * BLOCK_SECTOR_SIZE));
   ft_add_vaddr (vaddr, kpage);
-  spt_delete (spt, vaddr);
+  // spt_delete (spt, vaddr);
   pagedir_set_page (thread_current ()->pagedir, vaddr, kpage, true);
 }
 
+void swap_remove (block_sector_t block_index) {
+  bitmap_scan_and_flip (slot_list, block_index, PGSIZE / BLOCK_SECTOR_SIZE, true);
+}
+
 void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index) {
-  struct spte *spte = (struct spte *) malloc (sizeof(struct spte));
-  spte->vaddr = vaddr;
+  struct spte sample;
+  sample.vaddr = vaddr;
+  struct hash_elem *e = hash_find (spt, &sample.hash_elem);
+  struct spte *spte = hash_entry (e, struct spte, hash_elem);
   spte->block_index = block_index;
-  hash_insert (spt, &spte->hash_elem);
 }

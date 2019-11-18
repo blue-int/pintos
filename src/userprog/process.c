@@ -207,10 +207,10 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      spt_destroy (&cur->spt);
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-      spt_destroy (&cur->spt);
     }
 }
 
@@ -564,7 +564,9 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   bool success = pagedir_get_page (t->pagedir, upage) == NULL
               && pagedir_set_page (t->pagedir, upage, kpage, writable);
-  if (success)
+  if (success) {
     ft_add_vaddr (upage, kpage);
+    spt_insert (upage, kpage);
+  }
   return success;
 }

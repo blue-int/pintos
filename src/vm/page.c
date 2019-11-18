@@ -33,6 +33,7 @@ void spt_delete (struct hash *spt, void *vaddr) {
 
 void spt_destroy (struct hash *spt) {
   if (spt != NULL) {
+    hash_apply (spt, fte_remove);
     hash_destroy (spt, NULL);
   }
 }
