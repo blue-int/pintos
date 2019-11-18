@@ -16,20 +16,21 @@ bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *
   return spte_a->vaddr < spte_b->vaddr;
 }
 
-void spt_insert (void *vaddr, void *paddr) {
+void spt_insert (void *vaddr, void *paddr, bool writable) {
   struct thread *cur = thread_current ();
   struct spte *spte = (struct spte *) malloc (sizeof(struct spte));
   spte->vaddr = vaddr;
   spte->paddr = paddr;
   spte->status = FRAME;
+  spte->writable = writable;
   hash_insert (&cur->spt, &spte->hash_elem);
-  ft_add_vaddr (vaddr, paddr);
 }
 
 void spt_remove (struct hash_elem *e, void *aux UNUSED) {
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
-  fte_remove (spte->paddr);
-  if (spte->status == SWAP)
+  if (spte->paddr != NULL)
+    fte_remove (spte->paddr);
+  else if (spte->status == SWAP)
     swap_remove (spte->block_index);
   free (spte);
 }

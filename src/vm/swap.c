@@ -35,16 +35,16 @@ void swap_in (struct hash *spt, void *_vaddr) {
   // printf ("swap_in vaddr: %p\n", vaddr);
   struct hash_elem *e = hash_find (spt, &sample.hash_elem);
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
-  spte->status = FRAME;
   struct block *swap_block = block_get_role (BLOCK_SWAP);
-  uint8_t *kpage = ft_allocate (PAL_USER);
+  uint8_t *kpage = ft_allocate (PAL_USER, vaddr);
   // printf ("swap_in kpage: %p\n", kpage);
   bitmap_scan_and_flip (slot_list, spte->block_index, PGSIZE / BLOCK_SECTOR_SIZE, true);
   for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_read (swap_block, (spte->block_index) + i, kpage + (i * BLOCK_SECTOR_SIZE));
-  ft_add_vaddr (vaddr, kpage);
-  // spt_delete (spt, vaddr);
-  pagedir_set_page (thread_current ()->pagedir, vaddr, kpage, true);
+  spte->status = FRAME;
+  spte->paddr = kpage;
+  pagedir_set_page (thread_current ()->pagedir, vaddr, kpage, spte->writable);
+  ft_set_pin (kpage, false);
 }
 
 void swap_remove (block_sector_t block_index) {
@@ -56,6 +56,7 @@ void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index) {
   sample.vaddr = vaddr;
   struct hash_elem *e = hash_find (spt, &sample.hash_elem);
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
-  spte->block_index = block_index;
   spte->status = SWAP;
+  spte->block_index = block_index;
+  spte->paddr = NULL;
 }

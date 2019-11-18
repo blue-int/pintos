@@ -498,7 +498,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = ft_allocate (PAL_USER);
+      uint8_t *kpage = ft_allocate (PAL_USER, upage);
       if (kpage == NULL)
         return false;
 
@@ -534,7 +534,7 @@ setup_stack (void **esp)
   bool success = false;
 
   // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  kpage = ft_allocate (PAL_USER | PAL_ZERO);
+  kpage = ft_allocate (PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -565,7 +565,8 @@ install_page (void *upage, void *kpage, bool writable)
   bool success = pagedir_get_page (t->pagedir, upage) == NULL
               && pagedir_set_page (t->pagedir, upage, kpage, writable);
   if (success) {
-    spt_insert (upage, kpage);
+    spt_insert (upage, kpage, writable);
+    ft_set_pin (kpage, false);
   }
   return success;
 }

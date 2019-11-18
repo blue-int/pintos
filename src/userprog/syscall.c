@@ -169,8 +169,22 @@ int filesize (int fd) {
   return file_length (thread_current ()->fd[fd]);
 }
 
+void buffer_set_pin (void *buffer, unsigned size, bool status) {
+  struct hash *spt = &thread_current()->spt;
+  for (void *vaddr = pg_round_down(buffer); vaddr < buffer + size; vaddr += PGSIZE) {
+    struct spte sample;
+    sample.vaddr = vaddr;
+    struct hash_elem *e = hash_find (spt, &sample.hash_elem);
+    struct spte *spte = hash_entry (e, struct spte, hash_elem);
+    if (spte == NULL) PANIC ("no spte");
+    if (spte->status == FRAME) {
+      // printf ("spte paddr: %p\n", spte->paddr);
+      ft_set_pin (spte->paddr, status);
+    }
+  }
+}
+
 int read (int fd, void *buffer, unsigned size) {
-  ft_set_pin (buffer, size, true);
   check_valid_addr (buffer);
   struct thread *cur = thread_current ();
   int result = -1;
@@ -184,17 +198,17 @@ int read (int fd, void *buffer, unsigned size) {
     struct file* fp = cur->fd[fd];
     if (fp) {
       len = file_length (fp);
+      buffer_set_pin (buffer, size, true);
       len = file_read (fp, buffer, size);
+      buffer_set_pin (buffer, size, false);
       result = len;
     }
   }
   lock_release (&filesys_lock);
-  ft_set_pin (buffer, size, false);
   return result;
 }
 
 int write (int fd, const void *buffer, unsigned size) {
-  ft_set_pin ((void*)buffer, size, true);
   check_valid_addr (buffer);
   struct thread *cur = thread_current ();
   int result = -1;
@@ -205,11 +219,12 @@ int write (int fd, const void *buffer, unsigned size) {
   } else if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
     if (fp) {
+      buffer_set_pin ((void *)buffer, size, true);
       result = file_write (fp, buffer, size);
+      buffer_set_pin ((void *)buffer, size, false);
     }
   }
   lock_release (&filesys_lock);
-  ft_set_pin ((void *)buffer, size, false);
   return result;
 }
 

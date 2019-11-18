@@ -20,12 +20,13 @@ struct spte {
   void *vaddr;
   void *paddr;
   block_sector_t block_index;
+  bool writable;
 };
 
 void spt_init (struct hash *spt);
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED);
 bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
-void spt_insert (void *vaddr, void *paddr);
+void spt_insert (void *vaddr, void *paddr, bool writable);
 void spt_remove (struct hash_elem *e, void *aux UNUSED);
 void spt_destroy (struct hash *spt);
 

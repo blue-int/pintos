@@ -22,13 +22,11 @@ struct fte {
 };
 
 void ft_init (void);
-void ft_set_pin (void *buffer, unsigned size, bool status);
-void * ft_allocate (enum palloc_flags flags);
+void ft_set_pin (void *paddr, bool status);
+void * ft_allocate (enum palloc_flags flags, void *vaddr);
 void ft_evict (void);
-void ft_insert (void *paddr);
-void ft_add_vaddr (void *vaddr, void *paddr);
+void ft_insert (void *paddr, void *vaddr);
 void ft_delete (struct fte * fte);
 void fte_remove (void *paddr);
-void ft_destroy (void);
 
 #endif
