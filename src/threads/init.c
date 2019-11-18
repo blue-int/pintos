@@ -121,6 +121,7 @@ main (void)
 
 #ifdef VM
   ft_init ();
+  swap_init ();
 #endif
 
   /* Start thread scheduler and enable interrupts. */
