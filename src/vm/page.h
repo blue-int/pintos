@@ -7,8 +7,15 @@
 #include "threads/thread.h"
 #include "threads/malloc.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
+
+enum status {
+  FRAME,
+  SWAP
+};
 
 struct spte {
+  enum status status;
   struct hash_elem hash_elem;
   void *vaddr;
   void *paddr;
@@ -19,7 +26,7 @@ void spt_init (struct hash *spt);
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED);
 bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
 void spt_insert (void *vaddr, void *paddr);
-void spt_delete (struct hash *spt, void *vaddr);
+void spt_remove (struct hash_elem *e, void *aux UNUSED);
 void spt_destroy (struct hash *spt);
 
 #endif

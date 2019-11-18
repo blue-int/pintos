@@ -15,6 +15,32 @@ void ft_init (void) {
   lock_init (&alloc_lock);
 }
 
+void ft_set_pin (void *buffer, unsigned size, bool status) {
+  // printf ("thread %s buffer: %p size of : %d\n", thread_name (), buffer, size);
+  lock_acquire (&ft_lock);
+  struct spte sample;
+  sample.vaddr = pg_round_down (buffer);
+  struct hash_elem *e = hash_find (&thread_current ()->spt, &sample.hash_elem);
+  if (e != NULL) {
+    struct spte *spte = hash_entry (e, struct spte, hash_elem);
+    if (spte != NULL && spte->status == SWAP) {
+      printf ("spte not null and paddr points to %p\n",spte->paddr);
+      struct fte f_sample;
+      f_sample.paddr = spte->paddr;
+      struct hash_elem *elem = hash_find (&ft_hash, &f_sample.hash_elem);
+      if (elem != NULL) {
+        printf ("hash elem not null\n");
+        struct fte *fte = hash_entry (elem, struct fte, hash_elem);
+        if (fte != NULL) {
+          printf ("fte not null\n");
+          fte->accessed = status;
+        }
+      }
+    }
+  }
+  lock_release (&ft_lock);
+}
+
 void * ft_allocate (enum palloc_flags flags) {
   lock_acquire (&alloc_lock);
   void *kpage = palloc_get_page (flags);
@@ -41,6 +67,10 @@ void ft_evict (void) {
         printf ("NULL\n");
         continue;
       }
+      if (fte->accessed) {
+        printf ("accessed!\n");
+        continue;
+      }
       if (pagedir_is_accessed (pd, vaddr)) {
         pagedir_set_accessed (pd, vaddr, false);
       } 
@@ -65,6 +95,7 @@ void ft_insert (void *paddr) {
   struct fte *fte = (struct fte *) malloc (sizeof (struct fte));
   fte->paddr = paddr;
   fte->vaddr = NULL;
+  fte->accessed = false;
   fte->t = thread_current ();
   hash_insert (&ft_hash, &fte->hash_elem);
   list_push_back (&ft_list, &fte->list_elem);
@@ -93,17 +124,20 @@ void ft_delete (struct fte *fte) {
   lock_release (&ft_lock);
 }
 
-void fte_remove (struct hash_elem *e, void *aux UNUSED) {
+void fte_remove (void *paddr) {
   lock_acquire (&ft_lock);
-  struct spte *spte = hash_entry (e, struct spte, hash_elem);
   struct fte sample;
-  sample.paddr = spte->paddr;
+  sample.paddr = paddr;
   struct hash_elem *elem = hash_delete (&ft_hash, &sample.hash_elem);
+  if (elem == NULL) {
+    return;
+  }
   struct fte *fte = hash_entry (elem, struct fte, hash_elem);
-  list_remove (&fte->list_elem);
-  swap_remove (spte->block_index);
-  free (spte);
-  free (fte);
+  if (fte != NULL) {
+    list_remove (&fte->list_elem);
+    palloc_free_page (fte->paddr);
+    free (fte);
+  }
   lock_release (&ft_lock);
 }
 

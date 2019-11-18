@@ -18,15 +18,17 @@ struct fte {
   void *paddr;
   void *vaddr;
   struct thread *t;
+  bool accessed;
 };
 
 void ft_init (void);
+void ft_set_pin (void *buffer, unsigned size, bool status);
 void * ft_allocate (enum palloc_flags flags);
 void ft_evict (void);
 void ft_insert (void *paddr);
 void ft_add_vaddr (void *vaddr, void *paddr);
 void ft_delete (struct fte * fte);
-void fte_remove (struct hash_elem *e, void *aux UNUSED);
+void fte_remove (void *paddr);
 void ft_destroy (void);
 
 #endif

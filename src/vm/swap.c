@@ -29,14 +29,13 @@ bool swap_check (struct hash *spt, void *vaddr) {
 }
 
 void swap_in (struct hash *spt, void *_vaddr) {
-  // printf ("swap_in\n");
   struct spte sample;
   void *vaddr = pg_round_down(_vaddr);
   sample.vaddr = vaddr;
   // printf ("swap_in vaddr: %p\n", vaddr);
   struct hash_elem *e = hash_find (spt, &sample.hash_elem);
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
-
+  spte->status = FRAME;
   struct block *swap_block = block_get_role (BLOCK_SWAP);
   uint8_t *kpage = ft_allocate (PAL_USER);
   // printf ("swap_in kpage: %p\n", kpage);
@@ -58,4 +57,5 @@ void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index) {
   struct hash_elem *e = hash_find (spt, &sample.hash_elem);
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
   spte->block_index = block_index;
+  spte->status = SWAP;
 }

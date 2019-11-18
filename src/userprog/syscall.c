@@ -9,6 +9,7 @@
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
+#include "vm/frame.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
@@ -169,40 +170,47 @@ int filesize (int fd) {
 }
 
 int read (int fd, void *buffer, unsigned size) {
+  ft_set_pin (buffer, size, true);
   check_valid_addr (buffer);
   struct thread *cur = thread_current ();
+  int result = -1;
   int len;
+  lock_acquire (&filesys_lock);
+
   if (fd == 0) {
     input_getc ();
-    return size;
+    result = size;
   } else if (fd > 1 && fd < 128) {
-    lock_acquire (&filesys_lock);
     struct file* fp = cur->fd[fd];
     if (fp) {
       len = file_length (fp);
       len = file_read (fp, buffer, size);
-      
-      lock_release (&filesys_lock);
-      return len;
+      result = len;
     }
-    lock_release (&filesys_lock);
   }
-  return -1;
+  lock_release (&filesys_lock);
+  ft_set_pin (buffer, size, false);
+  return result;
 }
 
 int write (int fd, const void *buffer, unsigned size) {
+  ft_set_pin ((void*)buffer, size, true);
   check_valid_addr (buffer);
   struct thread *cur = thread_current ();
+  int result = -1;
+  lock_acquire (&filesys_lock);
   if (fd == 1 && size <= 512) {
     putbuf(buffer, size);
-    return size;
+    result =  size;
   } else if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
     if (fp) {
-      return file_write (fp, buffer, size);
+      result = file_write (fp, buffer, size);
     }
   }
-  return -1;
+  lock_release (&filesys_lock);
+  ft_set_pin ((void *)buffer, size, false);
+  return result;
 }
 
 void seek (int fd, unsigned position) {
