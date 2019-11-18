@@ -1,8 +1,10 @@
 #include "vm/page.h"
 #include <stdio.h>
 
-void spt_init (struct hash *spt) {
+struct hash * spt_init (void) {
+  struct hash *spt = (struct hash *) malloc (sizeof (struct hash));
   hash_init (spt, spt_hash_func, spt_less_func, NULL);
+  return spt;
 }
 
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED) {
@@ -23,7 +25,7 @@ void spt_insert (void *vaddr, void *paddr, bool writable) {
   spte->paddr = paddr;
   spte->status = FRAME;
   spte->writable = writable;
-  hash_insert (&cur->spt, &spte->hash_elem);
+  hash_insert (cur->spt, &spte->hash_elem);
 }
 
 void spt_remove (struct hash_elem *e, void *aux UNUSED) {
