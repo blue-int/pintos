@@ -44,6 +44,7 @@ void swap_in (struct hash *spt, void *_vaddr) {
   spte->status = FRAME;
   spte->paddr = kpage;
   pagedir_set_page (thread_current ()->pagedir, vaddr, kpage, spte->writable);
+  pagedir_set_accessed (thread_current ()->pagedir, vaddr, false);
   ft_set_pin (kpage, false);
 }
 

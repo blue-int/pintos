@@ -177,10 +177,8 @@ void buffer_set_pin (void *buffer, unsigned size, bool status) {
     struct hash_elem *e = hash_find (spt, &sample.hash_elem);
     struct spte *spte = hash_entry (e, struct spte, hash_elem);
     if (spte == NULL) PANIC ("no spte");
-    if (spte->status == FRAME) {
-      // printf ("spte paddr: %p\n", spte->paddr);
+    if (spte->status == FRAME)
       ft_set_pin (spte->paddr, status);
-    }
   }
 }
 
@@ -215,7 +213,7 @@ int write (int fd, const void *buffer, unsigned size) {
   lock_acquire (&filesys_lock);
   if (fd == 1 && size <= 512) {
     putbuf(buffer, size);
-    result =  size;
+    result = size;
   } else if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
     if (fp) {
