@@ -170,7 +170,7 @@ int filesize (int fd) {
 }
 
 void buffer_set_pin (void *buffer, unsigned size, bool status) {
-  struct hash *spt = thread_current()->spt;
+  struct hash *spt = &thread_current()->spt;
   for (void *vaddr = pg_round_down(buffer); vaddr < buffer + size; vaddr += PGSIZE) {
     struct spte sample;
     sample.vaddr = vaddr;

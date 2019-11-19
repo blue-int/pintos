@@ -161,7 +161,7 @@ page_fault (struct intr_frame *f)
   //         write ? "writing" : "reading",
   //         user ? "user" : "kernel");
 
-  struct hash *spt = thread_current()->spt;
+  struct hash *spt = &thread_current() -> spt;
   if (not_present && swap_check (spt, fault_addr)) {
     swap_in (spt, fault_addr);
     return;

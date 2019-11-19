@@ -47,7 +47,7 @@ void ft_evict (void) {
     {
       struct fte *fte = list_entry (e, struct fte, list_elem);
       uint32_t *pd = fte->t->pagedir;
-      struct hash *spt = fte->t->spt;
+      struct hash *spt = &fte->t->spt;
       void *vaddr = fte->vaddr;
       // printf ("%p evict candidate\n", vaddr);
       if (fte->accessed)

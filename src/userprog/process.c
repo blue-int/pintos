@@ -207,7 +207,7 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      spt_destroy (cur->spt);
+      spt_destroy (&cur->spt);
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
@@ -318,7 +318,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL) 
     goto done;
 #ifdef VM
-  t->spt = spt_init ();
+  spt_init (&(t->spt));
 #endif
   process_activate ();
 
