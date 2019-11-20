@@ -33,8 +33,10 @@ void spt_remove (struct hash_elem *e, void *aux UNUSED) {
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
   if (spte->paddr != NULL)
     fte_remove (spte->paddr);
-  else if (spte->status == SWAP)
+  else if (spte->status == SWAP){
+    // printf("swap_remove happens\n");
     swap_remove (spte->block_index);
+  }
   free (spte);
 }
 
@@ -45,13 +47,19 @@ void spt_destroy (struct hash *spt) {
 }
 
 bool grow_stack (void *fault_addr) {
-  // printf ("fault_addr: %p\n", fault_addr);
-  lock_acquire (&page_lock);
   bool success = false;
   void *new_page = pg_round_down (fault_addr);
+  if (new_page > PHYS_BASE - PGSIZE) {
+    return false;
+  }
+  struct spte sample;
+  sample.vaddr = new_page;
+  struct hash_elem *e = hash_find (&thread_current() -> spt, &sample.hash_elem);
+  if (e != NULL) {
+    return true;
+  }
   void *kpage = ft_allocate (PAL_USER | PAL_ZERO, new_page);
   if (kpage != NULL) {
-      // printf ("frame allocation succeeded\n");
       struct thread *t = thread_current ();
 
       success = pagedir_get_page (t->pagedir, new_page) == NULL
@@ -62,6 +70,5 @@ bool grow_stack (void *fault_addr) {
       } else
         palloc_free_page (kpage);
     }
-  lock_release (&page_lock);
-  return success;
+  return grow_stack(new_page + PGSIZE);
 }

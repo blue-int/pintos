@@ -17,8 +17,9 @@ bool swap_out (struct hash *spt, struct fte *fte) {
   lock_acquire (&swap_out_lock);
   struct block *swap_block = block_get_role (BLOCK_SWAP);
   size_t block_index = bitmap_scan_and_flip (slot_list, 0, PGSIZE / BLOCK_SECTOR_SIZE, false);
-  for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
+  for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++){
     block_write (swap_block, block_index + i, fte->paddr + i * BLOCK_SECTOR_SIZE);
+  }
   swap_insert (spt, fte->vaddr, block_index);
   lock_release (&swap_out_lock);
   return true;

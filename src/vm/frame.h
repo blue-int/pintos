@@ -17,13 +17,14 @@ struct fte {
   void *paddr;
   void *vaddr;
   struct thread *t;
-  bool accessed;
+  bool pinned;
 };
 
 void ft_init (void);
+void buffer_set_pin (void *buffer, unsigned size, bool pin);
 void ft_set_pin (void *paddr, bool status);
 void * ft_allocate (enum palloc_flags flags, void *vaddr);
-void ft_evict (void);
+bool ft_evict (void);
 void ft_insert (void *paddr, void *vaddr);
 void ft_delete (struct fte * fte);
 void fte_remove (void *paddr);

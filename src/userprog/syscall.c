@@ -197,6 +197,7 @@ int write (int fd, const void *buffer, unsigned size) {
   check_valid_addr (buffer);
   struct thread *cur = thread_current ();
   int result = -1;
+
   lock_acquire (&filesys_lock);
   if (fd == 1 && size <= 512) {
     putbuf(buffer, size);
