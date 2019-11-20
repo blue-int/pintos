@@ -1,8 +1,11 @@
 #include "vm/page.h"
 #include <stdio.h>
 
+struct lock page_lock;
+
 void spt_init (struct hash *spt) {
   hash_init (spt, spt_hash_func, spt_less_func, NULL);
+  lock_init (&page_lock);
 }
 
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED) {
@@ -39,4 +42,26 @@ void spt_destroy (struct hash *spt) {
   if (spt != NULL) {
     hash_destroy (spt, spt_remove);
   }
+}
+
+bool grow_stack (void *fault_addr) {
+  // printf ("fault_addr: %p\n", fault_addr);
+  lock_acquire (&page_lock);
+  bool success = false;
+  void *new_page = pg_round_down (fault_addr);
+  void *kpage = ft_allocate (PAL_USER | PAL_ZERO, new_page);
+  if (kpage != NULL) {
+      // printf ("frame allocation succeeded\n");
+      struct thread *t = thread_current ();
+
+      success = pagedir_get_page (t->pagedir, new_page) == NULL
+                  && pagedir_set_page (t->pagedir, new_page, kpage, true);
+      if (success) {
+        spt_insert (new_page, kpage, true);
+        ft_set_pin (kpage, false);
+      } else
+        palloc_free_page (kpage);
+    }
+  lock_release (&page_lock);
+  return success;
 }

@@ -29,5 +29,6 @@ bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *
 void spt_insert (void *vaddr, void *paddr, bool writable);
 void spt_remove (struct hash_elem *e, void *aux UNUSED);
 void spt_destroy (struct hash *spt);
+bool grow_stack (void *fault_addr);
 
 #endif

@@ -7,6 +7,7 @@
 #include "userprog/syscall.h"
 #ifdef VM
 #include "vm/swap.h"
+#include "vm/page.h"
 #endif
 
 /* Number of page faults processed. */
@@ -162,6 +163,19 @@ page_fault (struct intr_frame *f)
   //         user ? "user" : "kernel");
 
   struct hash *spt = &thread_current() -> spt;
+  void *esp = f->esp;
+
+  bool lower_bound = (fault_addr > PHYS_BASE - 0x800000);
+  bool upper_bound = (fault_addr < PHYS_BASE);
+  bool above_esp = fault_addr > f->esp;
+  bool inst_push = fault_addr == f->esp - 4;
+  bool inst_pusha = fault_addr == f->esp - 32;
+
+  if ((lower_bound && upper_bound) && (above_esp || inst_push || inst_pusha)) {
+    grow_stack (fault_addr);
+    return;
+  }
+
   if (not_present && swap_check (spt, fault_addr)) {
     swap_in (spt, fault_addr);
     return;
