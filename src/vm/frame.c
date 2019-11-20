@@ -95,6 +95,25 @@ void fte_remove (void *paddr) {
   lock_release (&ft_lock);
 }
 
+void buffer_set_pin (void *buffer, unsigned size, bool status) {
+  struct hash *spt = &thread_current()->spt;
+  for (void *vaddr = pg_round_down(buffer); vaddr < buffer + size; vaddr += PGSIZE) {
+    struct spte sample;
+    sample.vaddr = vaddr;
+    struct hash_elem *e = hash_find (spt, &sample.hash_elem);
+    struct spte *spte = hash_entry (e, struct spte, hash_elem);
+    if (spte == NULL) PANIC ("no spte");
+    if (spte->status == FRAME)
+      ft_set_pin (spte->paddr, status);
+    else if (spte->status == SWAP && status) {
+      swap_in (spt, spte->vaddr);
+      ft_set_pin (spte->paddr, status);
+    } else if (spte->status == SWAP && !status) {
+      ft_set_pin (spte->vaddr, status);
+    }
+  }
+}
+
 static unsigned ft_hash_func (const struct hash_elem *e, void *aux UNUSED) {
   struct fte *fte = hash_entry (e, struct fte, hash_elem);
   return hash_int((int)(fte->paddr));

@@ -166,10 +166,9 @@ page_fault (struct intr_frame *f)
     swap_in (spt, fault_addr);
     return;
   }
-  if (not_present || user){
-    // printf("It's not present: %d, or its user : %d\n", not_present, user);
+
+  if (not_present || user)
     exit (-1);
-  }
 
   kill (f);
 }

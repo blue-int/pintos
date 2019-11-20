@@ -32,12 +32,10 @@ void swap_in (struct hash *spt, void *_vaddr) {
   struct spte sample;
   void *vaddr = pg_round_down(_vaddr);
   sample.vaddr = vaddr;
-  // printf ("swap_in vaddr: %p\n", vaddr);
   struct hash_elem *e = hash_find (spt, &sample.hash_elem);
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
   struct block *swap_block = block_get_role (BLOCK_SWAP);
   uint8_t *kpage = ft_allocate (PAL_USER, vaddr);
-  // printf ("swap_in kpage: %p\n", kpage);
   bitmap_scan_and_flip (slot_list, spte->block_index, PGSIZE / BLOCK_SECTOR_SIZE, true);
   for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_read (swap_block, (spte->block_index) + i, kpage + (i * BLOCK_SECTOR_SIZE));
