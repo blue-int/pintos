@@ -1,11 +1,8 @@
 #include "vm/page.h"
 #include <stdio.h>
 
-struct lock page_lock;
-
 void spt_init (struct hash *spt) {
   hash_init (spt, spt_hash_func, spt_less_func, NULL);
-  lock_init (&page_lock);
 }
 
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED) {

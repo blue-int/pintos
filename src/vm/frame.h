@@ -28,6 +28,5 @@ bool ft_evict (void);
 void ft_insert (void *paddr, void *vaddr);
 void ft_delete (struct fte * fte);
 void fte_remove (void *paddr);
-void buffer_set_pin (void *buffer, unsigned size, bool status);
 
 #endif
