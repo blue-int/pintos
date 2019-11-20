@@ -204,7 +204,7 @@ int write (int fd, const void *buffer, unsigned size) {
   lock_acquire (&filesys_lock);
   if (fd == 1 && size <= 512) {
     putbuf(buffer, size);
-    result =  size;
+    result = size;
   } else if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
     if (fp) {
