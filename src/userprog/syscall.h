@@ -1,6 +1,7 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 #include <stdio.h>
+#include "vm/frame.h"
 
 void syscall_init (void);
 void check_valid_addr (const void *vaddr);
