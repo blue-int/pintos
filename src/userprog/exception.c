@@ -161,20 +161,22 @@ page_fault (struct intr_frame *f)
   //         write ? "writing" : "reading",
   //         user ? "user" : "kernel");
 
-  struct hash *spt = &thread_current() -> spt;
+  struct thread *cur = thread_current ();
+  struct hash *spt = &cur -> spt;
+
   bool lower_bound = (fault_addr > PHYS_BASE - 0x800000);
   bool upper_bound = (fault_addr < PHYS_BASE);
   bool above_esp = fault_addr > f->esp;
   bool inst_push = fault_addr == f->esp - 4;
   bool inst_pusha = fault_addr == f->esp - 32;
-
-  if ((lower_bound && upper_bound) && (above_esp || inst_push || inst_pusha)) {
-    grow_stack (fault_addr);
-    return;
-  }
+  bool base_flag = (above_esp || inst_push || inst_pusha);
 
   if (not_present && swap_check (spt, fault_addr)) {
     swap_in (spt, fault_addr);
+    return;
+  }
+  if ((lower_bound && upper_bound) && base_flag) {
+    grow_stack (fault_addr);
     return;
   }
   if (not_present || user){

@@ -27,6 +27,7 @@ syscall_handler (struct intr_frame *f)
   uint32_t *esp = (uint32_t *)(f->esp);
   check_valid_addr (esp);
   check_valid_addr (esp + 1);
+  printf("esp %p\n",esp);
   int sysnum = *(int *)f->esp;
   uint32_t *arg0 = (uint32_t *)(f->esp + 4);
   uint32_t *arg1 = (uint32_t *)(f->esp + 8);

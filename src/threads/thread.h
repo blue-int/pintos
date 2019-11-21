@@ -102,6 +102,8 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -117,6 +119,7 @@ struct thread
 
 #ifdef VM
     struct hash spt;                    /* Supplemental Page Table */
+    void *esp;                          /* User Stack Pointer */
 #endif
 
     /* Owned by thread.c. */

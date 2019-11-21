@@ -7,8 +7,6 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 
-struct lock swap_lock;
-
 void swap_init (void);
 bool swap_out (struct hash *spt, struct fte * fte);
 void swap_in (struct hash *spt, void *vaddr);
