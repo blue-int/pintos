@@ -21,16 +21,13 @@ bool swap_out (struct hash *spt, struct fte *fte) {
     block_write (swap_block, block_index + i, fte->paddr + i * BLOCK_SECTOR_SIZE);
   }
   swap_insert (spt, fte->vaddr, block_index);
-
-  lock_release (&swap_out_lock);  
+  lock_release (&swap_out_lock);
   return true;
 }
 
 bool swap_check (struct hash *spt, void *vaddr) {
-  struct spte sample;
-  sample.vaddr = pg_round_down(vaddr);
-  struct hash_elem *e = hash_find (spt, &sample.hash_elem);
-  if (e == NULL)
+  struct spte *spte = spt_find (spt, pg_round_down (vaddr));
+  if (spte == NULL || (spte->status != SWAP))
     return false;
   else
     return true;
@@ -38,11 +35,8 @@ bool swap_check (struct hash *spt, void *vaddr) {
 
 void swap_in (struct hash *spt, void *_vaddr) {
   lock_acquire (&swap_in_lock);
-  struct spte sample;
   void *vaddr = pg_round_down(_vaddr);
-  sample.vaddr = vaddr;
-  struct hash_elem *e = hash_find (spt, &sample.hash_elem);
-  struct spte *spte = hash_entry (e, struct spte, hash_elem);
+  struct spte *spte = spt_find (spt, vaddr);
   struct block *swap_block = block_get_role (BLOCK_SWAP);
   uint8_t *kpage = ft_allocate (PAL_USER, vaddr);
   bitmap_scan_and_flip (slot_list, spte->block_index, PGSIZE / BLOCK_SECTOR_SIZE, true);
@@ -61,10 +55,7 @@ void swap_remove (block_sector_t block_index) {
 }
 
 void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index) {
-  struct spte sample;
-  sample.vaddr = vaddr;
-  struct hash_elem *e = hash_find (spt, &sample.hash_elem);
-  struct spte *spte = hash_entry (e, struct spte, hash_elem);
+  struct spte *spte = spt_find (spt, vaddr);
   spte->status = SWAP;
   spte->block_index = block_index;
   spte->paddr = NULL;

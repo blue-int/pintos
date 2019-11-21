@@ -27,7 +27,6 @@ syscall_handler (struct intr_frame *f)
   uint32_t *esp = (uint32_t *)(f->esp);
   check_valid_addr (esp);
   check_valid_addr (esp + 1);
-  printf("esp %p\n",esp);
   int sysnum = *(int *)f->esp;
   uint32_t *arg0 = (uint32_t *)(f->esp + 4);
   uint32_t *arg1 = (uint32_t *)(f->esp + 8);
@@ -184,11 +183,9 @@ int read (int fd, void *buffer, unsigned size) {
     struct file* fp = cur->fd[fd];
     if (fp) {
       len = file_length (fp);
-      // printf("read pin \n");
       buffer_set_pin (buffer, size, true);
       len = file_read (fp, buffer, size);
       buffer_set_pin (buffer, size, false);
-      // printf("read pin end\n");
       result = len;
     }
   }
@@ -201,7 +198,6 @@ int write (int fd, const void *buffer, unsigned size) {
   struct thread *cur = thread_current ();
   int result = -1;
 
-  // printf ("thread %s trying to acquire write lock\n",cur->name);
   lock_acquire (&filesys_lock);
   if (fd == 1 && size <= 512) {
     putbuf(buffer, size);
@@ -214,7 +210,6 @@ int write (int fd, const void *buffer, unsigned size) {
       buffer_set_pin ((void *)buffer, size, false);
     }
   }
-  // printf ("thread %s trying to release write lock\n",cur->name);
   lock_release (&filesys_lock);
   return result;
 }
@@ -238,9 +233,8 @@ void close (int fd) {
   if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
     cur->fd[fd] = NULL;
-    if (fp){
+    if (fp)
       file_close (fp);
-    }
   }
   lock_release (&filesys_lock);
 }

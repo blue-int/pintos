@@ -37,35 +37,39 @@ void spt_remove (struct hash_elem *e, void *aux UNUSED) {
   free (spte);
 }
 
+struct spte *spt_find (struct hash *spt, void *vaddr) {
+  struct spte sample;
+  sample.vaddr = vaddr;
+  struct hash_elem *e = hash_find (spt, &sample.hash_elem);
+  if (e == NULL) return NULL;
+  struct spte *spte = hash_entry (e, struct spte, hash_elem);
+  return spte;
+}
+
 void spt_destroy (struct hash *spt) {
-  if (spt != NULL) {
+  if (spt != NULL)
     hash_destroy (spt, spt_remove);
-  }
 }
 
 bool grow_stack (void *fault_addr) {
   bool success = false;
   void *new_page = pg_round_down (fault_addr);
-  if (new_page > PHYS_BASE - PGSIZE) {
+  if (new_page >= PHYS_BASE - PGSIZE)
     return false;
-  }
-  struct spte sample;
-  sample.vaddr = new_page;
-  struct hash_elem *e = hash_find (&thread_current() -> spt, &sample.hash_elem);
-  if (e != NULL) {
+
+  struct thread *cur = thread_current ();
+  struct spte *spte = spt_find (&cur->spt, new_page);
+  if (spte != NULL)
     return true;
-  }
   void *kpage = ft_allocate (PAL_USER | PAL_ZERO, new_page);
   if (kpage != NULL) {
-      struct thread *t = thread_current ();
-
-      success = pagedir_get_page (t->pagedir, new_page) == NULL
-                  && pagedir_set_page (t->pagedir, new_page, kpage, true);
-      if (success) {
-        spt_insert (new_page, kpage, true);
-        ft_set_pin (kpage, false);
-      } else
-        palloc_free_page (kpage);
-    }
-  return grow_stack(new_page+PGSIZE);
+    success = pagedir_get_page (cur->pagedir, new_page) == NULL
+                && pagedir_set_page (cur->pagedir, new_page, kpage, true);
+    if (success) {
+      spt_insert (new_page, kpage, true);
+      ft_set_pin (kpage, false);
+    } else
+      palloc_free_page (kpage);
+  }
+  return grow_stack(new_page + PGSIZE);
 }

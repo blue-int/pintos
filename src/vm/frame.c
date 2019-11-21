@@ -73,18 +73,18 @@ bool ft_evict (void) {
       uint32_t *pd = fte->t->pagedir;
       struct hash *spt = &fte->t->spt;
       void *vaddr = fte->vaddr;
-      if (fte->pinned){
+      void *paddr = fte->paddr;
+      if (fte->pinned) {
         continue;
       }
       if (pagedir_is_accessed (pd, vaddr)) {
         pagedir_set_accessed (pd, vaddr, false);
       } 
       else {
-        pagedir_clear_page (pd, vaddr);
         swap_out (spt, fte);
-        palloc_free_page (fte->paddr);
-        // printf("ft_delete start\n");
         ft_delete (fte);
+        palloc_free_page (paddr);
+        pagedir_clear_page (pd, vaddr);
         return true;
       }
     }

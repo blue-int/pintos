@@ -11,7 +11,9 @@
 
 enum status {
   FRAME,
-  SWAP
+  SWAP,
+  DISK,
+  ZERO
 };
 
 struct spte {
@@ -21,6 +23,8 @@ struct spte {
   void *paddr;
   block_sector_t block_index;
   bool writable;
+  void *fp;
+  size_t ofs;
 };
 
 void spt_init (struct hash *spt);
@@ -28,6 +32,7 @@ unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED);
 bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
 void spt_insert (void *vaddr, void *paddr, bool writable);
 void spt_remove (struct hash_elem *e, void *aux UNUSED);
+struct spte *spt_find (struct hash *spt, void *vaddr);
 void spt_destroy (struct hash *spt);
 bool grow_stack (void *fault_addr);
 
