@@ -8,11 +8,13 @@
 #include "threads/malloc.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 
 enum status {
-  FRAME,
-  SWAP,
-  DISK,
+  ON_FRAME,
+  ON_SWAP,
+  ON_DISK,
   ZERO
 };
 
@@ -23,7 +25,7 @@ struct spte {
   void *paddr;
   block_sector_t block_index;
   bool writable;
-  void *fp;
+  struct file *fp;
   size_t ofs;
 };
 
@@ -34,6 +36,8 @@ void spt_insert (void *vaddr, void *paddr, bool writable);
 void spt_remove (struct hash_elem *e, void *aux UNUSED);
 struct spte *spt_find (struct hash *spt, void *vaddr);
 void spt_destroy (struct hash *spt);
+bool page_check (struct hash *spt, void *fault_addr);
 bool grow_stack (void *fault_addr);
+bool load_file (struct hash *spt, void *fault_addr);
 
 #endif

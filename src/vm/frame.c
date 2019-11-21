@@ -24,7 +24,7 @@ void buffer_set_pin (void *buffer, unsigned size, bool pin) {
       PANIC ("Hash elem null\n");
     struct spte *spte = hash_entry (e, struct spte, hash_elem);
     if (spte == NULL) PANIC ("no spte");
-    if (spte->status == FRAME) {
+    if (spte->status == ON_FRAME) {
       ft_set_pin (spte->paddr, pin);
     }
     else {
@@ -51,6 +51,7 @@ void ft_set_pin (void *paddr, bool status) {
 }
 
 void * ft_allocate (enum palloc_flags flags, void *vaddr) {
+  // printf ("allocation\n");
   lock_acquire (&ft_lock);
   void *kpage = palloc_get_page (flags);
   if (kpage == NULL) {

@@ -169,10 +169,8 @@ page_fault (struct intr_frame *f)
   bool inst_push = fault_addr == f->esp - 4;
   bool inst_pusha = fault_addr == f->esp - 32;
 
-  if (not_present && swap_check (spt, fault_addr)) {
-    swap_in (spt, fault_addr);
+  if (not_present && page_check (spt, fault_addr))
     return;
-  }
 
   if ((lower_bound && upper_bound) && (above_esp || inst_push || inst_pusha)) {
     grow_stack (fault_addr);

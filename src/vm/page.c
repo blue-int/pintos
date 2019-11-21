@@ -1,5 +1,6 @@
 #include "vm/page.h"
 #include <stdio.h>
+#include <string.h>
 
 void spt_init (struct hash *spt) {
   hash_init (spt, spt_hash_func, spt_less_func, NULL);
@@ -21,16 +22,18 @@ void spt_insert (void *vaddr, void *paddr, bool writable) {
   struct spte *spte = (struct spte *) malloc (sizeof(struct spte));
   spte->vaddr = vaddr;
   spte->paddr = paddr;
-  spte->status = FRAME;
+  spte->status = ON_FRAME;
   spte->writable = writable;
   hash_insert (&cur->spt, &spte->hash_elem);
 }
 
 void spt_remove (struct hash_elem *e, void *aux UNUSED) {
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
+  /* if (spte->fp != NULL)
+    file_close (spte->fp); */
   if (spte->paddr != NULL)
     fte_remove (spte->paddr);
-  else if (spte->status == SWAP){
+  else if (spte->status == ON_SWAP){
     // printf("swap_remove happens\n");
     swap_remove (spte->block_index);
   }
@@ -49,6 +52,21 @@ struct spte *spt_find (struct hash *spt, void *vaddr) {
 void spt_destroy (struct hash *spt) {
   if (spt != NULL)
     hash_destroy (spt, spt_remove);
+}
+
+bool page_check (struct hash *spt, void *fault_addr) {
+  struct spte *spte = spt_find (spt, pg_round_down (fault_addr));
+  if (spte == NULL)
+    return false;
+  else if (spte->status == ON_SWAP) {
+    swap_in (spt, fault_addr);
+    return true;
+  }
+  else if (spte->status == ON_DISK || spte->status == ZERO) {
+    return load_file (spt, fault_addr);
+  }
+  NOT_REACHED ();
+  return false;
 }
 
 bool grow_stack (void *fault_addr) {
@@ -72,4 +90,32 @@ bool grow_stack (void *fault_addr) {
       palloc_free_page (kpage);
   }
   return grow_stack(new_page + PGSIZE);
+}
+
+bool load_file (struct hash *spt, void *fault_addr) {
+  struct thread *cur = thread_current ();
+  void *new_page = pg_round_down (fault_addr);
+  struct spte *spte = spt_find (spt, new_page);
+
+  void *kpage = ft_allocate (PAL_USER, new_page);
+  if (kpage == NULL)
+    return false;
+
+  if (spte->status == ON_DISK) {
+    if (file_read_at (spte->fp, kpage, PGSIZE, spte->ofs) != PGSIZE)
+      {
+        palloc_free_page (kpage);
+        return false;
+      }
+  } else if (spte->status == ZERO)
+    memset (kpage, 0, PGSIZE);
+  bool success = pagedir_get_page (cur->pagedir, new_page) == NULL
+              && pagedir_set_page (cur->pagedir, new_page, kpage, false);
+  if (success) {
+    spt_insert (new_page, kpage, false);
+    ft_set_pin (kpage, false);
+  } else {
+    palloc_free_page (kpage);
+  }
+  return success;
 }
