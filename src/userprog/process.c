@@ -190,8 +190,16 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  struct list_elem *e;
+  for (e = list_begin (&cur->lock_list); e != list_end (&cur->lock_list); e = list_next (e)) {
+    struct lock *lock = list_entry (e, struct lock, lock_elem);
+    lock_release (lock);
+  }
+
   for (int i = 0; i < 128; i++)
     close (i);
+
   sema_up (&(cur->child_sema));
   sema_down (&(cur->exit_sema));
 

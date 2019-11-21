@@ -46,7 +46,7 @@ void spt_destroy (struct hash *spt) {
 bool grow_stack (void *fault_addr) {
   bool success = false;
   void *new_page = pg_round_down (fault_addr);
-  if (new_page > PHYS_BASE - PGSIZE) {
+  if (new_page >= PHYS_BASE - PGSIZE) {
     return false;
   }
   struct spte sample;
