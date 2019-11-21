@@ -119,7 +119,6 @@ struct thread
 
 #ifdef VM
     struct hash spt;                    /* Supplemental Page Table */
-    void *esp;                          /* User Stack Pointer */
 #endif
 
     /* Owned by thread.c. */

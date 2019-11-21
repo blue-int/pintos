@@ -113,7 +113,6 @@ stack_create (char *file_name, void **esp) {
   // return address
   *esp -= 4;
   **(int **)esp = 0;  
-  thread_current () -> esp = esp;
 }
 
 /* A thread function that loads a user process and starts it
