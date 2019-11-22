@@ -25,8 +25,11 @@ struct spte {
   void *paddr;
   block_sector_t block_index;
   bool writable;
+  bool dirty;
   struct file *fp;
   size_t ofs;
+  size_t read_bytes;
+  size_t zero_bytes;
 };
 
 void spt_init (struct hash *spt);

@@ -13,14 +13,14 @@ void swap_init (void) {
   lock_init (&swap_out_lock);
 }
 
-bool swap_out (struct hash *spt, struct fte *fte) {
+bool swap_out (struct hash *spt, struct fte *fte, bool dirty) {
   lock_acquire (&swap_out_lock);
   struct block *swap_block = block_get_role (BLOCK_SWAP);
   size_t block_index = bitmap_scan_and_flip (slot_list, 0, PGSIZE / BLOCK_SECTOR_SIZE, false);
   for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++){
     block_write (swap_block, block_index + i, fte->paddr + i * BLOCK_SECTOR_SIZE);
   }
-  swap_insert (spt, fte->vaddr, block_index);
+  swap_insert (spt, fte->vaddr, block_index, dirty);
   lock_release (&swap_out_lock);
   return true;
 }
@@ -38,6 +38,7 @@ void swap_in (struct hash *spt, void *_vaddr) {
   spte->paddr = kpage;
   pagedir_set_page (thread_current ()->pagedir, vaddr, kpage, spte->writable);
   pagedir_set_accessed (thread_current ()->pagedir, vaddr, false);
+  pagedir_set_dirty (thread_current ()->pagedir, vaddr, spte->dirty);
   ft_set_pin (kpage, false);
   lock_release (&swap_in_lock);
 }
@@ -46,9 +47,10 @@ void swap_remove (block_sector_t block_index) {
   bitmap_scan_and_flip (slot_list, block_index, PGSIZE / BLOCK_SECTOR_SIZE, true);
 }
 
-void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index) {
+void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index, bool dirty) {
   struct spte *spte = spt_find (spt, vaddr);
   spte->status = ON_SWAP;
   spte->block_index = block_index;
   spte->paddr = NULL;
+  spte->dirty = dirty;
 }

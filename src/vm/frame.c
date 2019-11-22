@@ -17,17 +17,18 @@ void ft_init (void) {
 void buffer_set_pin (void *buffer, unsigned size, bool pin) {
   struct hash *spt = &thread_current()->spt;
   for (void *vaddr = pg_round_down(buffer); vaddr < buffer + size; vaddr += PGSIZE) {
-    struct spte sample;
-    sample.vaddr = vaddr;
-    struct hash_elem *e = hash_find (spt, &sample.hash_elem);
-    if (e == NULL)
-      PANIC ("Hash elem null\n");
-    struct spte *spte = hash_entry (e, struct spte, hash_elem);
+    struct spte *spte = spt_find (spt, vaddr);
     if (spte == NULL) PANIC ("no spte");
     if (spte->status == ON_FRAME) {
       ft_set_pin (spte->paddr, pin);
     }
-    else {
+    else if (spte->status == ON_DISK || spte->status == ZERO) {
+      if (page_check (spt, vaddr))
+        ft_set_pin (spte->paddr, pin);
+      else
+        PANIC ("page check failed");
+    }
+    else if (spte->status == ON_SWAP) {
       if (pin) {
         swap_in (spt, vaddr);
       }
@@ -51,7 +52,6 @@ void ft_set_pin (void *paddr, bool status) {
 }
 
 void * ft_allocate (enum palloc_flags flags, void *vaddr) {
-  // printf ("allocation\n");
   lock_acquire (&ft_lock);
   void *kpage = palloc_get_page (flags);
   if (kpage == NULL) {
@@ -82,10 +82,23 @@ bool ft_evict (void) {
         pagedir_set_accessed (pd, vaddr, false);
       } 
       else {
-        swap_out (spt, fte);
+        struct spte *spte = spt_find (spt, vaddr);
+        pagedir_clear_page (pd, vaddr);
+        if (spte->status == ON_FRAME) {
+          swap_out (spt, fte, false);
+        } else if (spte->status == ZERO) {
+          spte->paddr = NULL;
+          spte->status = ZERO;
+        } else if (spte->status == ON_DISK) {
+          if (pagedir_is_dirty (pd, vaddr) || pagedir_is_dirty (pd, paddr)) {
+            swap_out (spt, fte, true);
+          } else {
+            spte->paddr = NULL;
+            spte->status = ON_DISK;
+          }
+        }
         ft_delete (fte);
         palloc_free_page (paddr);
-        pagedir_clear_page (pd, vaddr);
         return true;
       }
     }

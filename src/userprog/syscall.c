@@ -10,6 +10,7 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
@@ -108,7 +109,9 @@ syscall_handler (struct intr_frame *f)
 }
 
 void check_valid_addr (const void *vaddr) {
-  if (is_user_vaddr (vaddr) == false || !pagedir_get_page (thread_current ()->pagedir, vaddr))
+  struct hash *spt = &thread_current() ->spt;
+  struct spte *spte = spt_find (spt, (void *) pg_round_down (vaddr));
+  if (is_user_vaddr (vaddr) == false || (!pagedir_get_page (thread_current ()->pagedir, vaddr) && !spte))
     exit (-1);
 }
 

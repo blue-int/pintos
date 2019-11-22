@@ -19,22 +19,22 @@ bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *
 
 void spt_insert (void *vaddr, void *paddr, bool writable) {
   struct thread *cur = thread_current ();
-  struct spte *spte = (struct spte *) malloc (sizeof(struct spte));
+  struct spte *spte = spt_find (&cur->spt, vaddr);
+  if (spte == NULL) {
+    spte = (struct spte *) malloc (sizeof(struct spte));
+  }
   spte->vaddr = vaddr;
   spte->paddr = paddr;
-  spte->status = ON_FRAME;
   spte->writable = writable;
+  spte->status = ON_FRAME;
   hash_insert (&cur->spt, &spte->hash_elem);
 }
 
 void spt_remove (struct hash_elem *e, void *aux UNUSED) {
   struct spte *spte = hash_entry (e, struct spte, hash_elem);
-  /* if (spte->fp != NULL)
-    file_close (spte->fp); */
   if (spte->paddr != NULL)
     fte_remove (spte->paddr);
   else if (spte->status == ON_SWAP){
-    // printf("swap_remove happens\n");
     swap_remove (spte->block_index);
   }
   free (spte);
@@ -96,23 +96,25 @@ bool load_file (struct hash *spt, void *fault_addr) {
   struct thread *cur = thread_current ();
   void *new_page = pg_round_down (fault_addr);
   struct spte *spte = spt_find (spt, new_page);
+  size_t read_bytes = spte->read_bytes;
+  size_t zero_bytes = spte->zero_bytes;
+  bool writable = spte->writable;
 
   void *kpage = ft_allocate (PAL_USER, new_page);
   if (kpage == NULL)
     return false;
 
-  if (spte->status == ON_DISK) {
-    if (file_read_at (spte->fp, kpage, PGSIZE, spte->ofs) != PGSIZE)
-      {
-        palloc_free_page (kpage);
-        return false;
-      }
-  } else if (spte->status == ZERO)
-    memset (kpage, 0, PGSIZE);
+  if (file_read_at (spte->fp, kpage, read_bytes, spte->ofs) != (off_t)read_bytes)
+    {
+      palloc_free_page (kpage);
+      return false;
+    }
+  memset (kpage + read_bytes, 0, zero_bytes);
   bool success = pagedir_get_page (cur->pagedir, new_page) == NULL
-              && pagedir_set_page (cur->pagedir, new_page, kpage, false);
+              && pagedir_set_page (cur->pagedir, new_page, kpage, writable);
+  
   if (success) {
-    spt_insert (new_page, kpage, false);
+    spt_insert (new_page, kpage, writable);
     ft_set_pin (kpage, false);
   } else {
     palloc_free_page (kpage);
