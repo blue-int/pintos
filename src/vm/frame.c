@@ -82,6 +82,7 @@ bool ft_evict (void) {
         pagedir_set_accessed (pd, vaddr, false);
       } 
       else {
+        pagedir_clear_page (pd, vaddr);
         struct spte *spte = spt_find (spt, vaddr);
         if (spte->status == ON_FRAME) {
           bool dirty = pagedir_is_dirty (pd, vaddr);
@@ -101,9 +102,8 @@ bool ft_evict (void) {
         } else {
           NOT_REACHED ();
         }
-        ft_delete (fte);
         palloc_free_page (paddr);
-        pagedir_clear_page (pd, vaddr);
+        ft_delete (fte);
         return true;
       }
     }

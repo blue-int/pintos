@@ -34,12 +34,12 @@ void swap_in (struct hash *spt, void *_vaddr) {
   bitmap_scan_and_flip (slot_list, spte->block_index, PGSIZE / BLOCK_SECTOR_SIZE, true);
   for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_read (swap_block, (spte->block_index) + i, kpage + (i * BLOCK_SECTOR_SIZE));
-  spte->status = ON_FRAME;
   spte->paddr = kpage;
   pagedir_set_page (thread_current ()->pagedir, vaddr, kpage, spte->writable);
   pagedir_set_accessed (thread_current ()->pagedir, vaddr, false);
   pagedir_set_dirty (thread_current ()->pagedir, vaddr, false);
   ft_set_pin (kpage, false);
+  spte->status = ON_FRAME;
   lock_release (&swap_in_lock);
 }
 
@@ -49,6 +49,7 @@ void swap_remove (block_sector_t block_index) {
 
 void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index, bool dirty) {
   struct spte *spte = spt_find (spt, vaddr);
+  ASSERT (spte != NULL);
   spte->status = ON_SWAP;
   spte->block_index = block_index;
   spte->paddr = NULL;

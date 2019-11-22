@@ -21,7 +21,6 @@ bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *
 }
 
 void spt_insert (void *vaddr, void *paddr, bool writable, bool dirty) {
-  lock_acquire (&page_lock);
   struct thread *cur = thread_current ();
   struct hash *spt = &cur->spt;
   struct spte *spte = spt_find (spt, vaddr);
@@ -38,7 +37,6 @@ void spt_insert (void *vaddr, void *paddr, bool writable, bool dirty) {
   pagedir_set_dirty (cur->pagedir, vaddr, dirty);
   if (new)
     hash_insert (spt, &spte->hash_elem);
-  lock_release (&page_lock);
 }
 
 void spt_remove (struct hash_elem *e, void *aux UNUSED) {
@@ -77,7 +75,6 @@ bool page_check (struct hash *spt, void *fault_addr) {
     if (spte->status == ON_DISK || spte->status == ZERO) {
       return load_file (spt, fault_addr);
     } else {
-      NOT_REACHED ();
       return false;
     }
   }
