@@ -96,7 +96,7 @@ bool ft_evict (void) {
             }
           }
           else {
-            swap_out (spt, fte, true);
+            swap_out (spt, vaddr, paddr, true);
           }
         } else {
           NOT_REACHED ();

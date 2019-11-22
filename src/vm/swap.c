@@ -13,14 +13,14 @@ void swap_init (void) {
   lock_init (&swap_out_lock);
 }
 
-bool swap_out (struct hash *spt, struct fte *fte, bool dirty) {
+bool swap_out (struct hash *spt, void *vaddr, void *paddr, bool dirty) {
   lock_acquire (&swap_out_lock);
   struct block *swap_block = block_get_role (BLOCK_SWAP);
   size_t block_index = bitmap_scan_and_flip (slot_list, 0, PGSIZE / BLOCK_SECTOR_SIZE, false);
   for (int i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++){
-    block_write (swap_block, block_index + i, fte->paddr + i * BLOCK_SECTOR_SIZE);
+    block_write (swap_block, block_index + i, paddr + i * BLOCK_SECTOR_SIZE);
   }
-  swap_insert (spt, fte->vaddr, block_index, dirty);
+  swap_insert (spt, vaddr, block_index, dirty);
   lock_release (&swap_out_lock);
   return true;
 }
