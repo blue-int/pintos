@@ -83,22 +83,27 @@ bool ft_evict (void) {
       } 
       else {
         struct spte *spte = spt_find (spt, vaddr);
-        pagedir_clear_page (pd, vaddr);
         if (spte->status == ON_FRAME) {
-          swap_out (spt, fte, false);
-        } else if (spte->status == ZERO) {
-          spte->paddr = NULL;
-          spte->status = ZERO;
-        } else if (spte->status == ON_DISK) {
-          if (pagedir_is_dirty (pd, vaddr) || pagedir_is_dirty (pd, paddr)) {
-            swap_out (spt, fte, true);
-          } else {
+          bool dirty = pagedir_is_dirty (pd, vaddr);
+          size_t zero_bytes = spte->zero_bytes;
+          if (!dirty && !spte->dirty) {
             spte->paddr = NULL;
-            spte->status = ON_DISK;
+            if (zero_bytes == PGSIZE) {
+              spte->status = ZERO;
+            }
+            else {
+              spte->status = ON_DISK;
+            }
           }
+          else {
+            swap_out (spt, fte, true);
+          }
+        } else {
+          NOT_REACHED ();
         }
         ft_delete (fte);
         palloc_free_page (paddr);
+        pagedir_clear_page (pd, vaddr);
         return true;
       }
     }
