@@ -572,7 +572,7 @@ install_page (void *upage, void *kpage, bool writable)
               && pagedir_set_page (t->pagedir, upage, kpage, writable);
 
   if (success) {
-    spt_insert (upage, kpage, writable, true);
+    spt_insert (upage, kpage, writable, false);
     ft_set_pin (kpage, false);
   }
   return success;

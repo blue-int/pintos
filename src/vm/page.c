@@ -92,7 +92,7 @@ bool grow_stack (void *fault_addr) {
     success = pagedir_get_page (cur->pagedir, new_page) == NULL
                 && pagedir_set_page (cur->pagedir, new_page, kpage, true);
     if (success) {
-      spt_insert (new_page, kpage, true, true);
+      spt_insert (new_page, kpage, true, false);
       ft_set_pin (kpage, false);
     } else
       palloc_free_page (kpage);
@@ -114,12 +114,12 @@ bool load_file (struct hash *spt, void *fault_addr) {
   void *kpage = ft_allocate (PAL_USER, new_page);
   if (kpage == NULL)
     return false;
-
-  if (file_read_at (spte->fp, kpage, read_bytes, spte->ofs) != (off_t)read_bytes)
-    {
-      palloc_free_page (kpage);
-      return false;
-    }
+  if (spte->fp != NULL)
+    if (file_read_at (spte->fp, kpage, read_bytes, spte->ofs) != (off_t)read_bytes)
+      {
+        palloc_free_page (kpage);
+        return false;
+      }
   memset (kpage + read_bytes, 0, zero_bytes);
   bool success = pagedir_get_page (cur->pagedir, new_page) == NULL
               && pagedir_set_page (cur->pagedir, new_page, kpage, writable);

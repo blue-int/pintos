@@ -131,7 +131,10 @@ pid_t exec (const char *cmd_line) {
   check_valid_addr (p);
   while (*p != '\0')
     check_valid_addr (++p);
-  return process_execute (cmd_line);
+  lock_acquire (&filesys_lock);
+  pid_t pid = process_execute (cmd_line);
+  lock_release (&filesys_lock);
+  return pid;
 }
 
 int wait (pid_t pid) {
@@ -141,12 +144,18 @@ int wait (pid_t pid) {
 
 bool create (const char *file, unsigned initial_size) {
   check_valid_addr (file);
-  return filesys_create (file, initial_size);
+  lock_acquire (&filesys_lock);
+  bool success = filesys_create (file, initial_size);
+  lock_release (&filesys_lock);
+  return success;
 }
 
 bool remove (const char *file) {
   check_valid_addr (file);
-  return filesys_remove (file);
+  lock_acquire (&filesys_lock);
+  bool success = filesys_remove (file);
+  lock_release (&filesys_lock);
+  return success;
 }
 
 int open (const char *file) {
@@ -170,7 +179,10 @@ int open (const char *file) {
 }
 
 int filesize (int fd) {
-  return file_length (thread_current ()->fd[fd]);
+  lock_acquire (&filesys_lock);
+  int length = file_length (thread_current ()->fd[fd]);
+  lock_release (&filesys_lock);
+  return length;
 }
 
 int read (int fd, void *buffer, unsigned size) {
@@ -219,16 +231,21 @@ int write (int fd, const void *buffer, unsigned size) {
 }
 
 void seek (int fd, unsigned position) {
+  lock_acquire (&filesys_lock);
   struct thread *cur = thread_current ();
   if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
     if (fp)
       file_seek (fp, position);
   }
+  lock_release (&filesys_lock);
 }
 
 unsigned tell (int fd) {
-  return file_tell (thread_current ()->fd[fd]);
+  lock_acquire (&filesys_lock);
+  off_t pos = file_tell (thread_current ()->fd[fd]);
+  lock_release (&filesys_lock);
+  return pos;
 }
 
 void close (int fd) {

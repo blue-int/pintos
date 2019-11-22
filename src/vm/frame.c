@@ -17,23 +17,11 @@ void ft_init (void) {
 void buffer_set_pin (void *buffer, unsigned size, bool pin) {
   struct hash *spt = &thread_current()->spt;
   for (void *vaddr = pg_round_down(buffer); vaddr < buffer + size; vaddr += PGSIZE) {
+    if (pin) {
+      page_check (spt, vaddr);
+    }
     struct spte *spte = spt_find (spt, vaddr);
-    if (spte == NULL) PANIC ("no spte");
-    if (spte->status == ON_FRAME) {
-      ft_set_pin (spte->paddr, pin);
-    }
-    else if (spte->status == ON_DISK || spte->status == ZERO) {
-      if (page_check (spt, vaddr))
-        ft_set_pin (spte->paddr, pin);
-      else
-        PANIC ("page check failed");
-    }
-    else if (spte->status == ON_SWAP) {
-      if (pin) {
-        swap_in (spt, vaddr);
-      }
-      ft_set_pin (spte->paddr, pin);
-    }
+    ft_set_pin (spte->paddr, pin);
   }
 }
 
