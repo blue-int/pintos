@@ -25,8 +25,6 @@ void buffer_set_pin (void *buffer, unsigned size, bool pin);
 void ft_set_pin (void *paddr, bool status);
 void * ft_allocate (enum palloc_flags flags, void *vaddr);
 bool ft_evict (void);
-void ft_insert (void *paddr, void *vaddr);
-void ft_delete (struct fte * fte);
 void fte_remove (void *paddr);
 
 #endif

@@ -60,7 +60,13 @@ void * ft_allocate (enum palloc_flags flags, void *vaddr) {
       ft_evict();
     kpage = palloc_get_page (flags);
   }
-  ft_insert (kpage, vaddr);
+  struct fte *fte = (struct fte *) malloc (sizeof (struct fte));
+  fte->paddr = kpage;
+  fte->vaddr = vaddr;
+  fte->pinned = true;
+  fte->t = thread_current ();
+  hash_insert (&ft_hash, &fte->hash_elem);
+  list_push_back (&ft_list, &fte->list_elem);
   lock_release (&ft_lock);
   return kpage;
 }
@@ -78,52 +84,23 @@ bool ft_evict (void) {
       if (fte->pinned) {
         continue;
       }
-      if (pagedir_is_accessed (pd, vaddr)) {
+      else if (pagedir_is_accessed (pd, vaddr)) {
         pagedir_set_accessed (pd, vaddr, false);
+        continue;
       } 
       else {
-        pagedir_clear_page (pd, vaddr);
         struct spte *spte = spt_find (spt, vaddr);
-        if (spte->status == ON_FRAME) {
-          bool dirty = pagedir_is_dirty (pd, vaddr);
-          size_t zero_bytes = spte->zero_bytes;
-          if (!dirty && !spte->dirty) {
-            spte->paddr = NULL;
-            if (zero_bytes == PGSIZE) {
-              spte->status = ZERO;
-            }
-            else {
-              spte->status = ON_DISK;
-            }
-          }
-          else {
-            swap_out (spt, vaddr, paddr, true);
-          }
-        } else {
-          NOT_REACHED ();
-        }
+        pagedir_clear_page (pd, vaddr);
+        bool dirty = pagedir_is_dirty (pd, vaddr);
+        swap_out (spt, vaddr, paddr, dirty || spte->dirty);
+        hash_delete (&ft_hash, &fte->hash_elem);
+        list_remove (&fte->list_elem);
         palloc_free_page (paddr);
-        ft_delete (fte);
+        free (fte);
         return true;
       }
     }
   return false;
-}
-
-void ft_insert (void *paddr, void *vaddr) {
-  struct fte *fte = (struct fte *) malloc (sizeof (struct fte));
-  fte->paddr = paddr;
-  fte->vaddr = vaddr;
-  fte->pinned = true;
-  fte->t = thread_current ();
-  hash_insert (&ft_hash, &fte->hash_elem);
-  list_push_back (&ft_list, &fte->list_elem);
-}
-
-void ft_delete (struct fte *fte) {
-  hash_delete (&ft_hash, &fte->hash_elem);
-  list_remove (&fte->list_elem);
-  free (fte);
 }
 
 void fte_remove (void *paddr) {

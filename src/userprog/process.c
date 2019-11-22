@@ -567,9 +567,10 @@ install_page (void *upage, void *kpage, bool writable)
   struct thread *t = thread_current ();
 
   /* Verify that there's not already a page at that virtual
-     address, then map our page there. */
+     address, then map our page there. */  
   bool success = pagedir_get_page (t->pagedir, upage) == NULL
               && pagedir_set_page (t->pagedir, upage, kpage, writable);
+
   if (success) {
     spt_insert (upage, kpage, writable, true);
     ft_set_pin (kpage, false);

@@ -2,11 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
-static struct lock page_lock;
-
 void spt_init (struct hash *spt) {
   hash_init (spt, spt_hash_func, spt_less_func, NULL);
-  lock_init (&page_lock);
 }
 
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED) {
@@ -32,8 +29,8 @@ void spt_insert (void *vaddr, void *paddr, bool writable, bool dirty) {
   spte->vaddr = vaddr;
   spte->paddr = paddr;
   spte->writable = writable;
-  spte->status = ON_FRAME;
   spte->dirty = dirty;
+  spte->status = ON_FRAME;
   pagedir_set_dirty (cur->pagedir, vaddr, dirty);
   if (new)
     hash_insert (spt, &spte->hash_elem);
@@ -75,7 +72,7 @@ bool page_check (struct hash *spt, void *fault_addr) {
     if (spte->status == ON_DISK || spte->status == ZERO) {
       return load_file (spt, fault_addr);
     } else {
-      return false;
+      return true;
     }
   }
 }
@@ -110,6 +107,9 @@ bool load_file (struct hash *spt, void *fault_addr) {
   size_t read_bytes = spte->read_bytes;
   size_t zero_bytes = spte->zero_bytes;
   bool writable = spte->writable;
+
+  // if (pagedir_get_page (cur->pagedir, new_page))
+    // return true;
 
   void *kpage = ft_allocate (PAL_USER, new_page);
   if (kpage == NULL)
