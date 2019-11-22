@@ -571,7 +571,7 @@ install_page (void *upage, void *kpage, bool writable)
   bool success = pagedir_get_page (t->pagedir, upage) == NULL
               && pagedir_set_page (t->pagedir, upage, kpage, writable);
   if (success) {
-    spt_insert (upage, kpage, writable);
+    spt_insert (upage, kpage, writable, true);
     ft_set_pin (kpage, false);
   }
   return success;

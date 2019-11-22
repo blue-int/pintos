@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 
+static struct lock page_lock;
+
 void spt_init (struct hash *spt) {
   hash_init (spt, spt_hash_func, spt_less_func, NULL);
+  lock_init (&page_lock);
 }
 
 unsigned spt_hash_func (const struct hash_elem *e, void *aux UNUSED) {
@@ -17,17 +20,25 @@ bool spt_less_func (const struct hash_elem *a, const struct hash_elem *b, void *
   return spte_a->vaddr < spte_b->vaddr;
 }
 
-void spt_insert (void *vaddr, void *paddr, bool writable) {
+void spt_insert (void *vaddr, void *paddr, bool writable, bool dirty) {
+  lock_acquire (&page_lock);
   struct thread *cur = thread_current ();
-  struct spte *spte = spt_find (&cur->spt, vaddr);
+  struct hash *spt = &cur->spt;
+  struct spte *spte = spt_find (spt, vaddr);
+  bool new = false;
   if (spte == NULL) {
+    new = true;
     spte = (struct spte *) malloc (sizeof(struct spte));
   }
   spte->vaddr = vaddr;
   spte->paddr = paddr;
   spte->writable = writable;
   spte->status = ON_FRAME;
-  hash_insert (&cur->spt, &spte->hash_elem);
+  spte->dirty = dirty;
+  pagedir_set_dirty (cur->pagedir, vaddr, dirty);
+  if (new)
+    hash_insert (spt, &spte->hash_elem);
+  lock_release (&page_lock);
 }
 
 void spt_remove (struct hash_elem *e, void *aux UNUSED) {
@@ -58,15 +69,18 @@ bool page_check (struct hash *spt, void *fault_addr) {
   struct spte *spte = spt_find (spt, pg_round_down (fault_addr));
   if (spte == NULL)
     return false;
-  else if (spte->status == ON_SWAP) {
+  if (spte->status == ON_SWAP) {
     swap_in (spt, fault_addr);
     return true;
   }
-  else if (spte->status == ON_DISK || spte->status == ZERO) {
-    return load_file (spt, fault_addr);
+  else {
+    if (spte->status == ON_DISK || spte->status == ZERO) {
+      return load_file (spt, fault_addr);
+    } else {
+      NOT_REACHED ();
+      return false;
+    }
   }
-  NOT_REACHED ();
-  return false;
 }
 
 bool grow_stack (void *fault_addr) {
@@ -84,12 +98,12 @@ bool grow_stack (void *fault_addr) {
     success = pagedir_get_page (cur->pagedir, new_page) == NULL
                 && pagedir_set_page (cur->pagedir, new_page, kpage, true);
     if (success) {
-      spt_insert (new_page, kpage, true);
+      spt_insert (new_page, kpage, true, true);
       ft_set_pin (kpage, false);
     } else
       palloc_free_page (kpage);
   }
-  return grow_stack(new_page + PGSIZE);
+  return grow_stack (new_page + PGSIZE);
 }
 
 bool load_file (struct hash *spt, void *fault_addr) {
@@ -112,9 +126,8 @@ bool load_file (struct hash *spt, void *fault_addr) {
   memset (kpage + read_bytes, 0, zero_bytes);
   bool success = pagedir_get_page (cur->pagedir, new_page) == NULL
               && pagedir_set_page (cur->pagedir, new_page, kpage, writable);
-  
   if (success) {
-    spt_insert (new_page, kpage, writable);
+    spt_insert (new_page, kpage, writable, false);
     ft_set_pin (kpage, false);
   } else {
     palloc_free_page (kpage);

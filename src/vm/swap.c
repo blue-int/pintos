@@ -38,7 +38,7 @@ void swap_in (struct hash *spt, void *_vaddr) {
   spte->paddr = kpage;
   pagedir_set_page (thread_current ()->pagedir, vaddr, kpage, spte->writable);
   pagedir_set_accessed (thread_current ()->pagedir, vaddr, false);
-  pagedir_set_dirty (thread_current ()->pagedir, vaddr, spte->dirty);
+  pagedir_set_dirty (thread_current ()->pagedir, vaddr, false);
   ft_set_pin (kpage, false);
   lock_release (&swap_in_lock);
 }
