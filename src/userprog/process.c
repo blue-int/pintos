@@ -511,14 +511,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       spte->paddr = NULL;
       spte->writable = writable;
       spte->dirty = false;
-      spte->fp = file;
       spte->ofs = ofs;
       spte->read_bytes = page_read_bytes;
       spte->zero_bytes = page_zero_bytes;
       if (page_zero_bytes == PGSIZE) {
+        spte->fp = NULL;
         spte->status = ZERO;
       }
       else {
+        spte->fp = file;
         spte->status = ON_DISK;
       }
       hash_insert (spt, &spte->hash_elem);

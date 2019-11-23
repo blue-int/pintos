@@ -153,6 +153,21 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  if (not_present) {
+    if (page_check (&thread_current ()->spt, fault_addr)) return;
+
+    bool lower_bound = (fault_addr >= PHYS_BASE - 0x800000);
+    bool upper_bound = (fault_addr < PHYS_BASE);
+    bool above_esp = fault_addr >= f->esp;
+    bool inst_push = fault_addr == f->esp - 4;
+    bool inst_pusha = fault_addr == f->esp - 32;
+
+    if ((lower_bound && upper_bound) && (above_esp || inst_push || inst_pusha)) {
+      grow_stack (fault_addr);
+      return;
+    }
+  }
+
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
@@ -161,21 +176,6 @@ page_fault (struct intr_frame *f)
   //         not_present ? "not present" : "rights violation",
   //         write ? "writing" : "reading",
   //         user ? "user" : "kernel");
-
-  struct hash *spt = &thread_current() -> spt;
-  bool lower_bound = (fault_addr >= PHYS_BASE - 0x800000);
-  bool upper_bound = (fault_addr < PHYS_BASE);
-  bool above_esp = fault_addr >= f->esp;
-  bool inst_push = fault_addr == f->esp - 4;
-  bool inst_pusha = fault_addr == f->esp - 32;
-
-  if (not_present && page_check (spt, fault_addr))
-    return;
-
-  if ((lower_bound && upper_bound) && (above_esp || inst_push || inst_pusha)) {
-    grow_stack (fault_addr);
-    return;
-  }
 
   exit (-1);
 

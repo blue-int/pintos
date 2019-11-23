@@ -17,10 +17,10 @@ void ft_init (void) {
 void buffer_set_pin (void *buffer, unsigned size, bool pin) {
   struct hash *spt = &thread_current()->spt;
   for (void *vaddr = pg_round_down(buffer); vaddr < buffer + size; vaddr += PGSIZE) {
-    if (pin) {
+    struct spte *spte = spt_find (spt, vaddr);
+    if (pin && spte->status != ON_FRAME) {
       page_check (spt, vaddr);
     }
-    struct spte *spte = spt_find (spt, vaddr);
     ft_set_pin (spte->paddr, pin);
   }
 }
@@ -78,12 +78,24 @@ bool ft_evict (void) {
       } 
       else {
         struct spte *spte = spt_find (spt, vaddr);
+        bool dirty = pagedir_is_dirty (pd, vaddr) || pagedir_is_dirty (pd, paddr);
+        ASSERT (spte->status == ON_FRAME);
+        spte->paddr = NULL;
+        spte->dirty = dirty;
+        if (spte->fp != NULL && !dirty) {
+          spte->status = ON_DISK;
+        }
+        else if (spte->fp == NULL && spte->zero_bytes == PGSIZE && !dirty) {
+          spte->status = ZERO;
+        }
+        else {
+          swap_out (spt, vaddr, paddr);
+          spte->status = ON_SWAP;
+        }
         pagedir_clear_page (pd, vaddr);
-        bool dirty = pagedir_is_dirty (pd, vaddr);
-        swap_out (spt, vaddr, paddr, dirty || spte->dirty);
+        palloc_free_page (paddr);
         hash_delete (&ft_hash, &fte->hash_elem);
         list_remove (&fte->list_elem);
-        palloc_free_page (paddr);
         free (fte);
         return true;
       }

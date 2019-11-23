@@ -8,9 +8,8 @@
 #include "vm/page.h"
 
 void swap_init (void);
-bool swap_out (struct hash *spt, void *vaddr, void *paddr, bool dirty);
+bool swap_out (struct hash *spt, void *vaddr, void *paddr);
 void swap_in (struct hash *spt, void *vaddr);
 void swap_remove (block_sector_t block_index);
-void swap_insert (struct hash *spt, void *vaddr, block_sector_t block_index, bool dirty);
 
 #endif
