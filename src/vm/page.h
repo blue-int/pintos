@@ -18,6 +18,14 @@ enum status {
   ZERO
 };
 
+struct mape {
+  int mapid;
+  struct list_elem list_elem;
+  struct file *fp;
+  size_t size;
+  void *addr;
+};
+
 struct spte {
   enum status status;
   struct hash_elem hash_elem;

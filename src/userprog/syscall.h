@@ -1,6 +1,7 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 #include <stdio.h>
+#include <user/syscall.h>
 #include "vm/frame.h"
 
 void syscall_init (void);
@@ -22,5 +23,7 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+mapid_t mmap (int fd, void *addr);
+void munmap (mapid_t);
 
 #endif /* userprog/syscall.h */

@@ -200,6 +200,11 @@ process_exit (void)
   for (int i = 0; i < 128; i++)
     close (i);
 
+  while (!list_empty (&cur->map_list)) {
+    struct mape *mape = list_entry (list_begin (&cur->map_list), struct mape, list_elem);
+    munmap (mape->mapid);
+  }
+
   sema_up (&(cur->child_sema));
   sema_down (&(cur->exit_sema));
 

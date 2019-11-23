@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include <string.h>
+#include <bitmap.h>
+#include <round.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -15,10 +17,12 @@
 #include "filesys/file.h"
 
 static void syscall_handler (struct intr_frame *);
+static struct bitmap *mmap_index;
 
 void
 syscall_init (void) 
 {
+  mmap_index = bitmap_create (128);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -103,6 +107,16 @@ syscall_handler (struct intr_frame *f)
     close ((int)*arg0);
     break;
   
+  case SYS_MMAP:
+    check_valid_addr (arg0);
+    f->eax = mmap ((int)*arg0, (void *)*arg1);
+    break;
+  
+  case SYS_MUNMAP:
+    check_valid_addr (arg1);
+    munmap ((mapid_t)*arg0);
+    break;
+  
   default:
     break;
   }
@@ -111,7 +125,7 @@ syscall_handler (struct intr_frame *f)
 void check_valid_addr (const void *vaddr) {
   struct hash *spt = &thread_current() ->spt;
   struct spte *spte = spt_find (spt, (void *) pg_round_down (vaddr));
-  if (is_user_vaddr (vaddr) == false || (!pagedir_get_page (thread_current ()->pagedir, vaddr) && !spte)){
+  if (is_user_vaddr (vaddr) == false || (pagedir_get_page (thread_current ()->pagedir, vaddr) == NULL && spte == NULL)) {
     exit (-1);
   }
 }
@@ -258,4 +272,127 @@ void close (int fd) {
       file_close (fp);
   }
   lock_release (&filesys_lock);
+}
+
+mapid_t mmap (int fd, void *addr) {
+  if (fd == 0 || fd == 1) {
+    exit (-1);
+  }
+  if (addr != pg_round_down (addr) || addr == NULL || addr == 0) {
+    return -1;
+  }
+
+  lock_acquire (&filesys_lock);
+
+  struct thread *cur = thread_current ();
+  struct file *fp = file_reopen (cur->fd[fd]);
+  struct hash *spt = &cur->spt;
+  struct list *map_list = &cur->map_list;
+  uint32_t size = file_length (fp);
+  for (int i = 0; i < (ROUND_UP (size, PGSIZE) / PGSIZE); i++) {
+    struct spte *overlap = spt_find (spt, addr);
+    if (overlap != NULL){
+      lock_release (&filesys_lock);
+      return -1;
+    }
+  }
+  if (size <= 0) {
+    exit (-1);
+  }
+  struct mape *mape = (struct mape *) malloc (sizeof(struct mape));
+  mape->fp = fp;
+  mape->addr = addr;
+  mape->size = size;
+  mapid_t mapid = (mapid_t) bitmap_scan_and_flip (mmap_index, 0, 1, false);
+  mape->mapid = mapid;
+  list_push_back (map_list, &mape->list_elem);
+  off_t ofs = 0;
+  uint32_t read_bytes = size;
+  uint32_t zero_bytes = PGSIZE - (size - ((size/PGSIZE) * PGSIZE));
+  while (read_bytes > 0 || zero_bytes > 0) 
+    {
+      /* Calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    
+      struct spte *spte = (struct spte *) malloc (sizeof(struct spte));
+      spte->vaddr = addr;
+      spte->paddr = NULL;
+      spte->writable = true;
+      spte->dirty = false;
+      spte->ofs = ofs;
+      spte->read_bytes = page_read_bytes;
+      spte->zero_bytes = page_zero_bytes;
+      if (page_zero_bytes == PGSIZE) {
+        spte->fp = NULL;
+        spte->status = ZERO;
+      }
+      else {
+        spte->fp = fp;
+        spte->status = ON_DISK;
+      }
+      hash_insert (spt, &spte->hash_elem);
+      /* Advance. */
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      addr += PGSIZE;
+      ofs += PGSIZE;
+    }
+  lock_release (&filesys_lock);
+  return mapid;
+}
+
+void munmap (mapid_t mapping) {
+  lock_acquire (&filesys_lock);
+  
+  struct thread *cur = thread_current ();
+  struct hash *spt = &cur->spt;
+  struct list *map_list = &cur->map_list;
+  struct list_elem *e;
+  struct mape *mape;
+  for (e = list_begin (map_list); e != list_end (map_list); e = list_next (e)) {
+    mape = list_entry (e, struct mape, list_elem);
+    if (mape->mapid == mapping) {
+      size_t index = bitmap_scan_and_flip (mmap_index, mapping, 1, true);
+      if (index == BITMAP_ERROR) {
+        PANIC ("munmap BITMAP ERROR");
+      }
+      int size = mape->size;
+      void *vaddr = mape->addr;
+      int free_count = (size%PGSIZE == 0) ? size/PGSIZE : size/PGSIZE+1;
+      for (int i = 0; i < free_count; i++) {
+        struct spte *spte = spt_find (spt, vaddr + (i*PGSIZE));
+        if (spte == NULL) {
+          PANIC ("munmap spte cannot be found\n");
+        }
+        void *pd = cur->pagedir;
+        bool dirty = pagedir_is_dirty (pd, spte->vaddr) || pagedir_is_dirty (pd, spte->paddr) || spte->dirty;
+        if (dirty) {
+          if (spte->status == ON_SWAP) {
+            swap_in (spt, spte->vaddr);
+          }
+          buffer_set_pin (spte->vaddr, spte->read_bytes, true);
+          file_write_at (spte->fp, spte->vaddr, spte->read_bytes, spte->ofs);
+          buffer_set_pin (spte->vaddr, spte->read_bytes, false);
+        }
+        pagedir_clear_page (pd, spte->vaddr);
+        hash_delete (spt, &spte->hash_elem);
+        if (spte->paddr != NULL) {
+          fte_remove (spte->paddr);
+        }
+        free (spte);
+      }
+      list_remove (&mape->list_elem);
+      file_close (mape->fp);
+      free (mape);
+      lock_release (&filesys_lock);
+      return;
+    }
+  }
+  PANIC ("Unreachable point reached\n");
+  file_close (mape->fp);
+  lock_release (&filesys_lock);
+
 }
