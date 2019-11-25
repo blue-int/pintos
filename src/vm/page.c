@@ -29,7 +29,7 @@ void spt_insert (void *vaddr, void *paddr, bool writable, bool dirty) {
   spte->dirty = dirty;
   spte->status = ON_FRAME;
   pagedir_set_dirty (cur->pagedir, vaddr, dirty);
-  pagedir_set_dirty (cur->pagedir, paddr, dirty);
+  // pagedir_set_dirty (cur->pagedir, paddr, dirty);
   hash_insert (spt, &spte->hash_elem);
 }
 
