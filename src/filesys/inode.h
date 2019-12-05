@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "filesys/off_t.h"
+#include "filesys/cache.h"
 #include "devices/block.h"
 
 struct bitmap;
