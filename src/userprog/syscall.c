@@ -289,7 +289,7 @@ mapid_t mmap (int fd, void *addr) {
   struct hash *spt = &cur->spt;
   struct list *map_list = &cur->map_list;
   uint32_t size = file_length (fp);
-  for (int i = 0; i < (ROUND_UP (size, PGSIZE) / PGSIZE); i++) {
+  for (unsigned i = 0; i < (ROUND_UP (size, PGSIZE) / PGSIZE); i++) {
     struct spte *overlap = spt_find (spt, addr);
     if (overlap != NULL){
       lock_release (&filesys_lock);

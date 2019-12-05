@@ -15,9 +15,11 @@ struct bce {
 };
 
 void cache_init (void);
-// struct bce * cache_evict (void);
 void cache_clear (struct bce *bce);
-struct bce * cache_allocate (void);
+void cache_read (struct block *block, block_sector_t sector, void *buffer, int size, int offset);
+void cache_write (struct block *block, block_sector_t sector, void *buffer, int size, int offset);
 
+struct bce *cache_allocate (void);
+struct bce *cache_find (block_sector_t sector);
 
 #endif
