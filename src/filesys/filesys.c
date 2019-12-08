@@ -36,6 +36,7 @@ filesys_init (bool format)
 void
 filesys_done (void) 
 {
+  cache_flush (fs_device);
   free_map_close ();
 }
 

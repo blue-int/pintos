@@ -20,7 +20,7 @@ void cache_init (void) {
   }
 }
 
-struct bce * cache_allocate (void) {
+struct bce * cache_allocate (struct block *block) {
   struct bce *empty_target = NULL;
   struct bce *evict_target = NULL;
   int acc_cnt = -1;
@@ -31,9 +31,13 @@ struct bce * cache_allocate (void) {
     struct bce *bce = list_entry (e, struct bce, list_elem);
     if (bce->valid == false) {
       empty_target = bce;
+      empty_target->valid = true;
+      lock_release (&cache_lock);
+      return empty_target;
     }
-    if (acc_cnt < bce->acc_cnt) {
+    if (acc_cnt == -1 || acc_cnt > bce->acc_cnt) {
       evict_target = bce;
+      acc_cnt = bce->acc_cnt;
     }
   }
 
@@ -43,42 +47,32 @@ struct bce * cache_allocate (void) {
     ASSERT (evict_target->acc_cnt != -1);
     ASSERT (evict_target->valid == 1);
     lock_acquire (&evict_target->bce_lock);
-    lock_release (&cache_lock);
-    struct block *filesys_block = block_get_role (BLOCK_FILESYS);
-    block_write (filesys_block, evict_target->sector, evict_target->buffer);
+    lock_release (&cache_lock);   
+    if (evict_target->dirty) 
+      block_write (block, evict_target->sector, evict_target->buffer);
+    
     cache_clear (evict_target);
     lock_release (&evict_target->bce_lock);
     return evict_target;
   }
   else {
-    empty_target->valid = true;
-    lock_release (&cache_lock);
-    return empty_target;
+    PANIC ("Unreachable Point From Allocation\n");
   }
 }
 
 void
 cache_read (struct block *block, block_sector_t sector, void *buffer, int size, int offset)
 { 
-  struct bce *target = cache_find (sector);
+  struct bce *target = cache_find (block, sector);
   
-  if (target == NULL) {
-    target = cache_allocate ();
-    lock_acquire (&target->bce_lock);
-    block_read (block, sector, target->buffer);
-  }
-  else
-    printf("target has been found\n");
-  printf("%d is target sector and %d is sector_idx\n", target->sector, sector);
-  // target->sector = sector;
+  lock_acquire (&target->bce_lock);
 
-  if (!lock_held_by_current_thread (&target->bce_lock))
-    lock_acquire (&target->bce_lock);
-
-  if (offset == 0 && size == BLOCK_SECTOR_SIZE)
+  if (offset == 0 && size == BLOCK_SECTOR_SIZE) {
     memcpy (buffer, target->buffer, size);
-  else 
+  }
+  else {
     memcpy (buffer, target->buffer + offset, size);
+  }
 
   target->acc_cnt += 1;
   lock_release (&target->bce_lock);
@@ -87,21 +81,14 @@ cache_read (struct block *block, block_sector_t sector, void *buffer, int size, 
 void
 cache_write (struct block *block, block_sector_t sector, void *buffer, int size, int offset)
 { 
-  struct bce *target = cache_find (sector);
+  struct bce *target = cache_find (block, sector);
 
-  if (target == NULL) {
-    target = cache_allocate ();
-    lock_acquire (&target->bce_lock);
-    block_read (block, sector, target->buffer);
-  }
-
-  if (!lock_held_by_current_thread (&target->bce_lock))
-    lock_acquire (&target->bce_lock);
+  lock_acquire (&target->bce_lock); 
 
   target->dirty = true;
   if (offset == 0 && size == BLOCK_SECTOR_SIZE)
     memcpy (target->buffer, buffer, size);
-  else 
+  else
     memcpy (target->buffer + offset, buffer, size);
 
   // block_write (block, sector, target->buffer);
@@ -109,15 +96,22 @@ cache_write (struct block *block, block_sector_t sector, void *buffer, int size,
 
 }
 
-struct bce *cache_find (block_sector_t sector) {
+struct bce *cache_find (struct block *block, block_sector_t sector) {
   struct list_elem *e;
+  struct bce *bce = NULL;
   for (e = list_begin (&buffer_cache); e != list_end (&buffer_cache); e = list_next (e)) {
-    struct bce *bce = list_entry (e, struct bce, list_elem);
+    bce = list_entry (e, struct bce, list_elem);
     if (bce->sector == sector) {
       return bce;
     }
   }
-  return NULL;
+  bce = cache_allocate (block);
+  lock_acquire (&bce->bce_lock);
+  block_read (block, sector, bce->buffer);
+  bce->sector = sector;
+  bce->valid = true;
+  lock_release (&bce->bce_lock);
+  return bce;
 }
 
 void cache_clear (struct bce *bce) {
@@ -125,5 +119,17 @@ void cache_clear (struct bce *bce) {
   bce->sector = -1;
   bce->valid = false;
   bce->dirty = false;
+  // memset(bce->buffer, 0, BLOCK_SECTOR_SIZE);
 }
 
+void cache_flush (struct block *block) {
+  struct list_elem *e;
+  struct bce *bce = NULL;
+  for (e = list_begin (&buffer_cache); e != list_end (&buffer_cache); e = list_next (e)) {
+    bce = list_entry (e, struct bce, list_elem);
+    if (bce->dirty) {
+      block_write (block, bce->sector, bce->buffer);
+      bce->dirty = false;
+    }
+  }
+}

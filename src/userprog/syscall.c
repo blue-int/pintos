@@ -203,7 +203,6 @@ int read (int fd, void *buffer, unsigned size) {
   check_valid_addr (buffer);
   struct thread *cur = thread_current ();
   int result = -1;
-  int len;
   lock_acquire (&filesys_lock);
 
   if (fd == 0) {
@@ -212,11 +211,9 @@ int read (int fd, void *buffer, unsigned size) {
   } else if (fd > 1 && fd < 128) {
     struct file* fp = cur->fd[fd];
     if (fp) {
-      len = file_length (fp);
       buffer_set_pin (buffer, size, true);
-      len = file_read (fp, buffer, size);
+      result = file_read (fp, buffer, size);
       buffer_set_pin (buffer, size, false);
-      result = len;
     }
   }
   lock_release (&filesys_lock);

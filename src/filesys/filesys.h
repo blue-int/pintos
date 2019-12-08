@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "filesys/off_t.h"
+#include "filesys/cache.h"
 #include "threads/synch.h"
 
 /* Sectors of system file inodes. */
