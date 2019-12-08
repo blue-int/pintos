@@ -5,12 +5,11 @@
 #include "devices/block.h"
 
 struct bce {
-  block_sector_t sector;
-  uint8_t buffer[BLOCK_SECTOR_SIZE];
-  int acc_cnt;
   bool valid;
   bool dirty;
-  struct lock bce_lock;
+  int acc_cnt;
+  block_sector_t sector;
+  uint8_t buffer[BLOCK_SECTOR_SIZE];
   struct list_elem list_elem;
 };
 
