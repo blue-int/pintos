@@ -28,11 +28,19 @@ free_map_init (void)
 bool free_map_allocate (block_sector_t *sectorp, size_t *index)
 {
   block_sector_t sector = bitmap_scan_and_flip(free_map, *index, 1, false);
+  if (sector == BITMAP_ERROR) {
+    sector = bitmap_scan_and_flip(free_map, 0, 1, false);
+  }
+
   if (sector != BITMAP_ERROR && free_map_file != NULL && !bitmap_write(free_map, free_map_file))
   {
     bitmap_set_multiple(free_map, sector, 1, false);
     sector = BITMAP_ERROR;
   }
+  
+  if (sector == BITMAP_ERROR)
+    PANIC("Free map allocate failed\n");
+
   if (sector != BITMAP_ERROR)
     *sectorp = sector;
   *index = sector + 1;

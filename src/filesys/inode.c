@@ -48,21 +48,6 @@ struct inode
     struct lock inode_lock;
   };
 
-/* Returns the block device sector that contains byte offset POS
-   within INODE.
-   Returns -1 if INODE does not contain data for a byte at offset
-   POS. */
-/* static block_sector_t
-byte_to_sector (const struct inode *inode, off_t pos) 
-{
-  ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  else
-    return -1;
-} */
-static struct lock allocate_lock;
-
 static struct indirect *read_indirect (block_sector_t sector);
 static void inode_allocate(struct inode_disk *, size_t, size_t);
 
@@ -120,13 +105,11 @@ void
 inode_init (void) 
 {
   list_init (&open_inodes);
-  lock_init (&allocate_lock);
 }
 
 static void
 inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t sectors)
 {
-  lock_acquire (&allocate_lock);
   static char zeros[BLOCK_SECTOR_SIZE];
   size_t index = 0;
   
@@ -134,7 +117,6 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
   
   if (sectors > 0 && start_sector < 124)
     {
-      // printf ("direct\n");
       // up to 124 direct blocks allocate & write zeros
       size_t start_idx = start_sector;
       size_t inode_count = start_idx + sectors <= 124 ? start_idx + sectors : 124;
@@ -148,13 +130,14 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
     }
   if (sectors > 0 && start_sector < 124 + 128)
     {
-      // printf ("indirect %d\n", sectors);
       // up to 128 singly indirect blocks allocate & write zeros
       // s_indirect block allocate & write
       struct indirect *s_indirect = calloc (1, sizeof (struct indirect));
+      if ( (int) disk_inode->s_indirect != -1) 
+        cache_read (fs_device, disk_inode->s_indirect, s_indirect, BLOCK_SECTOR_SIZE, 0);
+
       size_t start_idx = start_sector - 124;
       size_t inode_count = start_idx + sectors <= 128 ? start_idx + sectors : 128;
-      // printf ("stating at %d, and %d many blocks\n", start_idx, inode_count);
       for (size_t i = start_idx; i < inode_count; i++)
         {
           free_map_allocate (&s_indirect->blocks[i], &index);
@@ -162,18 +145,25 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
           start_sector++;
           sectors--;
         }
-      free_map_allocate (&disk_inode->s_indirect, &index);
+      if ( (int) disk_inode->s_indirect == -1) 
+        free_map_allocate (&disk_inode->s_indirect, &index);
       cache_write (fs_device, disk_inode->s_indirect, s_indirect, BLOCK_SECTOR_SIZE, 0);
       free (s_indirect);
     }
   if (sectors > 0 && start_sector < 124 + 128 + 128 * 128)
     {
-      // printf ("d_indirect\n");
       // up to 128*128 doubly indirect blocks allocate & write zeros
       // up to 128 indirect blocks allocate & write
       // d_indirect block allocate & write
-      
+
       struct indirect *d_indirect = calloc (1, sizeof (struct indirect));
+      if ( (int) disk_inode->d_indirect != -1) 
+        cache_read (fs_device, disk_inode->d_indirect, d_indirect, BLOCK_SECTOR_SIZE, 0);
+      else {
+        for (int i = 0; i < 128; i++)
+          d_indirect->blocks[i] = -1;
+      }
+
       size_t start_idx = start_sector - 124 - 128;
       size_t end_idx = start_idx + sectors - 1;
       size_t start_indirect_sector = start_idx / 128;
@@ -184,24 +174,30 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
       for (size_t i = start_indirect_sector; i <= end_indirect_sector; i++)
         {
           struct indirect *indirect = calloc (1, sizeof (struct indirect));
+          if ((int)d_indirect->blocks[i] != -1) 
+            cache_read (fs_device, d_indirect->blocks[i], indirect, BLOCK_SECTOR_SIZE, 0);
+
           size_t start = i == start_indirect_sector ? start_indirect_offset : 0;
-          size_t end = i == end_indirect_sector ? end_indirect_offset : 128;
-          for (size_t j = start; j < end; j++)
+          size_t end = i == end_indirect_sector ? end_indirect_offset : 127;
+          for (size_t j = start; j <= end; j++)
             {
               free_map_allocate (&indirect->blocks[j], &index);
               cache_write (fs_device, indirect->blocks[j], zeros, BLOCK_SECTOR_SIZE, 0);
               start_sector++;
               sectors--;
             }
-          free_map_allocate (&d_indirect->blocks[i], &index);
+          if ((int)d_indirect->blocks[i] == -1) 
+            free_map_allocate (&d_indirect->blocks[i], &index);
+
           cache_write (fs_device, d_indirect->blocks[i], indirect, BLOCK_SECTOR_SIZE, 0);
           free (indirect);
         }
-      free_map_allocate (&disk_inode->d_indirect, &index);
+      if ( (int) disk_inode->d_indirect == -1) {
+        free_map_allocate (&disk_inode->d_indirect, &index);
+      }
       cache_write (fs_device, disk_inode->d_indirect, d_indirect, BLOCK_SECTOR_SIZE, 0);
       free (d_indirect);
     }
-  lock_release (&allocate_lock);
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -227,6 +223,8 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->s_indirect = -1;
+      disk_inode->d_indirect = -1;
       inode_allocate (disk_inode, 0, sectors);
       // disk_inode write
       cache_write (fs_device, sector, disk_inode, BLOCK_SECTOR_SIZE, 0);
@@ -383,14 +381,16 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   
   if (size <= 0)
     return 0;
+
   if ((int)new_byte_to_sector (inode, offset + size - 1) == -1) {
     // PANIC ("file growth needed\n");
     off_t old_len = inode->data.length;
     off_t new_len = offset + size;
-    size_t start_sector = bytes_to_sectors (old_len + BLOCK_SECTOR_SIZE);
+    size_t start_sector = bytes_to_sectors (old_len);
     size_t end_sector = bytes_to_sectors (new_len);
-    
-    inode_allocate (&inode->data, start_sector, end_sector - start_sector + 1);
+    if (start_sector < end_sector) {
+      inode_allocate (&inode->data, start_sector, end_sector - start_sector);
+    }
 
     inode->data.length = new_len;
     cache_write (fs_device, inode->sector, &inode->data, BLOCK_SECTOR_SIZE, 0);
