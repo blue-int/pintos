@@ -526,18 +526,20 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->wakeup_tick = -1;
   t->host_lock = NULL;
-#ifdef USERPROG
+// #ifdef USERPROG
   for (int i = 0; i < 128; i++)
     t->fd[i] = NULL;
   
   struct thread *cur = running_thread ();
+
   t->parent = cur;
+  t->cwd = cur->cwd;
   list_init (&(t->child_list));
   sema_init (&(t->child_sema), 0);
   sema_init (&(t->load_sema), 0);
   sema_init (&(t->exit_sema), 0);
   list_push_back (&(cur->child_list), &(t->child_elem));
-#endif
+// #endif
 #ifdef VM
   list_init (&(t->map_list));
 #endif

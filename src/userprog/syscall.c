@@ -117,6 +117,31 @@ syscall_handler (struct intr_frame *f)
     munmap ((mapid_t)*arg0);
     break;
   
+  case SYS_CHDIR:
+    check_valid_addr (arg0);
+    f->eax = chdir ((const char*)*arg0);
+    break;
+
+  case SYS_MKDIR:
+    check_valid_addr (arg0);
+    f->eax = mkdir ((const char*)*arg0);
+    break;
+
+  case SYS_READDIR:
+    check_valid_addr (arg1);
+    f->eax = readdir ((int)*arg0, (char*)*arg1);
+    break;
+
+  case SYS_ISDIR:
+    check_valid_addr (arg0);
+    f->eax = isdir ((int)*arg0);
+    break;
+
+  case SYS_INUMBER:
+    check_valid_addr (arg0);
+    f->eax = inumber ((int)*arg0);
+    break;  
+
   default:
     break;
   }
@@ -393,3 +418,138 @@ void munmap (mapid_t mapping) {
   lock_release (&filesys_lock);
 
 }
+
+bool
+chdir (const char *dir)
+{
+  if (strlen(dir) == 0)
+    return true;
+  char file_name[15];
+  struct dir *dir_ptr = NULL;
+
+  // lock_acquire (&filesys_lock);
+  parse_path (dir, file_name, &dir_ptr);
+  // lock_release (&filesys_lock);
+  printf("%s filename %p dir_ptr\n",file_name, dir_ptr);
+  if (strchr(file_name, 47) != NULL)
+    return false;
+
+  struct inode *inode;
+  if (dir_lookup (dir_ptr, file_name, &inode))
+    dir_ptr = dir_open (inode);
+  else {
+    return false;
+  }
+
+  struct thread *cur = thread_current ();
+  cur->cwd = dir_ptr;
+
+  return true;
+}
+
+bool
+mkdir (const char *dir)
+{
+  if (strlen(dir) == 0)
+    return false;
+  char file_name[15];
+  struct dir *dir_ptr = NULL;
+  // lock_acquire (&filesys_lock);
+  parse_path (dir, file_name, &dir_ptr);
+  // lock_release (&filesys_lock);
+  if (strchr(file_name, 47) != NULL)
+    return false;
+
+  bool success = filesys_create_dir (file_name, dir_ptr);
+  // dir_close (dir_ptr);
+
+  return success; 
+}
+
+bool
+readdir (int fd, char *name) 
+{
+  return true;
+}
+
+bool
+isdir (int fd) 
+{
+  struct thread *cur = thread_current ();
+  struct file *fp = cur->fd[fd];
+  struct inode *inode = file_get_inode (fp);
+
+  return inode_dir (inode);
+}
+
+int
+inumber (int fd) 
+{
+  return 0;
+}
+
+void parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
+
+  //string token 
+  // . .. / 
+  // if . current directory
+  // if .. parent directory 
+  // if starts with / it's absolute path
+  // if starts with characters it's relative path
+
+  /* 
+  
+  /path/to/some/absolute
+
+  */
+  char *save;
+  char *token;
+  char *root = "/";
+  struct inode *inode;
+  size_t len = strlen(dir);
+  char dir_copy[len];
+  bool abs_flag = false;
+  strlcpy (dir_copy, dir, len+1);
+  struct thread *cur = thread_current ();
+
+  if (dir_copy[0] == root[0]) {
+    *dir_ptr = dir_open_root ();
+    abs_flag = true;
+  }
+  else {
+    *dir_ptr = dir_reopen(cur->cwd);
+  }
+  
+  token = strtok_r (dir_copy, "/", &save);
+
+  if (!token) 
+    return;
+
+  if (dir_lookup (*dir_ptr, token, &inode)) {
+    *dir_ptr = dir_open (inode);
+  }
+  else {
+    strlcpy (file_name, token, strlen(token)+1);
+    return;
+  }
+
+  while (token) {
+    token = strtok_r (NULL, "/", &save);
+
+    if (!token) 
+      return;
+
+    if (dir_lookup (*dir_ptr, token, &inode)){
+      *dir_ptr = dir_open (inode);
+    }
+    else {
+      strlcpy (file_name, token, strlen(token));
+      return;
+    }
+  };
+
+  return;
+}
+
+
+

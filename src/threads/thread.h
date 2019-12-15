@@ -7,6 +7,7 @@
 #include "synch.h"
 #include <hash.h>
 #include "vm/page.h"
+#include "filesys/directory.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -102,6 +103,8 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    /* Information needed for filesys */
+    struct dir* cwd;                    /* Current Working directory */
 
 
 #ifdef USERPROG

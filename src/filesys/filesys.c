@@ -2,6 +2,7 @@
 #include <debug.h>
 #include <stdio.h>
 #include <string.h>
+#include "threads/thread.h"
 #include "filesys/file.h"
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
@@ -28,6 +29,10 @@ filesys_init (bool format)
   if (format) 
     do_format ();
 
+  struct thread *cur = thread_current ();
+  cur->cwd = dir_open_root ();
+  dir_close (cur->cwd);
+
   free_map_open ();
 }
 
@@ -48,15 +53,42 @@ bool
 filesys_create (const char *name, off_t initial_size) 
 {
   block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
+  struct thread *cur = thread_current ();
+  struct inode *inode;
+  struct dir *dir = dir_reopen (cur->cwd);
+  // struct dir *root = dir_open_root ();
+  // if (cur->cwd != ){
+    // dir = cur->cwd;
+  // }
+  // else
+  printf ("dir %p %p\n", dir, cur->cwd);
+    dir = dir_open_root ();
+  printf ("dir %p\n", dir);
+
   size_t index = 0;
   bool success = (dir != NULL
                   && free_map_allocate (&inode_sector, &index)
-                  && inode_create (inode_sector, initial_size)
+                  && inode_create (inode_sector, initial_size, false)
                   && dir_add (dir, name, inode_sector));
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
+
+  return success;
+}
+
+bool
+filesys_create_dir (const char *name, void *dir_ptr) 
+{
+  block_sector_t inode_sector = 0;
+  struct dir *dir = (struct dir *) dir_ptr;
+  size_t index = 0;
+  bool success = (dir != NULL
+                  && free_map_allocate (&inode_sector, &index)
+                  && inode_create (inode_sector, 0, true)
+                  && dir_add (dir, name, inode_sector));
+  if (!success && inode_sector != 0) 
+    free_map_release (inode_sector, 1);
 
   return success;
 }

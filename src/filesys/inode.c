@@ -10,7 +10,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define MAX_SECTOR_SIZE 128 * 128 + 128 + 124
+#define MAX_SECTOR_SIZE 128 * 128 + 128 + 123
 
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
@@ -18,7 +18,9 @@ struct inode_disk
   {
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    block_sector_t direct[124];
+    bool dir;                           /* Is directory flag */
+
+    block_sector_t direct[123];
     block_sector_t s_indirect;
     block_sector_t d_indirect;
   };
@@ -67,24 +69,24 @@ new_byte_to_sector (const struct inode *inode, off_t pos)
     return -1;
   }
 
-  if (sectors < 124)
+  if (sectors < 123)
   {
     return inode->data.direct[sectors];
   }
-  else if (sectors < 124 + 128)
+  else if (sectors < 123 + 128)
   {
     block_sector_t s_indirect = inode->data.s_indirect;
     struct indirect *block = read_indirect (s_indirect);
-    block_sector_t sector = block->blocks[sectors - 124];
+    block_sector_t sector = block->blocks[sectors - 123];
     free (block);
     return sector;
   }
-  else if (sectors < 124 + 128 + 128 * 128)
+  else if (sectors < 123 + 128 + 128 * 128)
   {
     block_sector_t d_indirect_1 = inode->data.d_indirect;
     struct indirect *block_1 = read_indirect (d_indirect_1);
-    block_sector_t d_indirect_2 = (sectors - 124 - 128) / 128;
-    int offset = (sectors - 124 - 128) % 128;
+    block_sector_t d_indirect_2 = (sectors - 123 - 128) / 128;
+    int offset = (sectors - 123 - 128) % 128;
     struct indirect *block_2 = read_indirect (block_1->blocks[d_indirect_2]);
     block_sector_t sector = block_2->blocks[offset];
     free(block_1);
@@ -115,11 +117,11 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
   
   if (sectors > MAX_SECTOR_SIZE) PANIC ("file size is too big");
   
-  if (sectors > 0 && start_sector < 124)
+  if (sectors > 0 && start_sector < 123)
     {
-      // up to 124 direct blocks allocate & write zeros
+      // up to 123 direct blocks allocate & write zeros
       size_t start_idx = start_sector;
-      size_t inode_count = start_idx + sectors <= 124 ? start_idx + sectors : 124;
+      size_t inode_count = start_idx + sectors <= 123 ? start_idx + sectors : 123;
       for (size_t i = start_idx; i < inode_count; i++)
         {
           free_map_allocate (&disk_inode->direct[i], &index);
@@ -128,7 +130,7 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
           sectors--;
         }
     }
-  if (sectors > 0 && start_sector < 124 + 128)
+  if (sectors > 0 && start_sector < 123 + 128)
     {
       // up to 128 singly indirect blocks allocate & write zeros
       // s_indirect block allocate & write
@@ -136,7 +138,7 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
       if ( (int) disk_inode->s_indirect != -1) 
         cache_read (fs_device, disk_inode->s_indirect, s_indirect, BLOCK_SECTOR_SIZE, 0);
 
-      size_t start_idx = start_sector - 124;
+      size_t start_idx = start_sector - 123;
       size_t inode_count = start_idx + sectors <= 128 ? start_idx + sectors : 128;
       for (size_t i = start_idx; i < inode_count; i++)
         {
@@ -150,7 +152,7 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
       cache_write (fs_device, disk_inode->s_indirect, s_indirect, BLOCK_SECTOR_SIZE, 0);
       free (s_indirect);
     }
-  if (sectors > 0 && start_sector < 124 + 128 + 128 * 128)
+  if (sectors > 0 && start_sector < 123 + 128 + 128 * 128)
     {
       // up to 128*128 doubly indirect blocks allocate & write zeros
       // up to 128 indirect blocks allocate & write
@@ -164,7 +166,7 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
           d_indirect->blocks[i] = -1;
       }
 
-      size_t start_idx = start_sector - 124 - 128;
+      size_t start_idx = start_sector - 123 - 128;
       size_t end_idx = start_idx + sectors - 1;
       size_t start_indirect_sector = start_idx / 128;
       size_t start_indirect_offset = start_idx % 128;
@@ -206,7 +208,7 @@ inode_allocate (struct inode_disk *disk_inode, size_t start_sector, size_t secto
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -225,6 +227,7 @@ inode_create (block_sector_t sector, off_t length)
       disk_inode->magic = INODE_MAGIC;
       disk_inode->s_indirect = -1;
       disk_inode->d_indirect = -1;
+      disk_inode->dir = dir;
       inode_allocate (disk_inode, 0, sectors);
       // disk_inode write
       cache_write (fs_device, sector, disk_inode, BLOCK_SECTOR_SIZE, 0);
@@ -448,4 +451,11 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+/* Returns if inode disk is direcotry or not*/
+bool
+inode_dir (const struct inode *inode)
+{
+  return inode->data.dir;
 }

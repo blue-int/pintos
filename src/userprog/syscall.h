@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <user/syscall.h>
 #include "vm/frame.h"
+#include "filesys/directory.h"
+#include "filesys/inode.h"
 
 void syscall_init (void);
 void check_valid_addr (const void *vaddr);
@@ -25,5 +27,11 @@ unsigned tell (int fd);
 void close (int fd);
 mapid_t mmap (int fd, void *addr);
 void munmap (mapid_t);
+bool chdir (const char *dir);
+bool mkdir (const char *dir);
+bool readdir (int fd, char *name);
+bool isdir (int fd);
+int inumber (int fd);
+void parse_path (const char *dir, char *file_name, struct dir **dir_ptr);
 
 #endif /* userprog/syscall.h */
