@@ -55,15 +55,13 @@ filesys_create (const char *name, off_t initial_size)
   block_sector_t inode_sector = 0;
   struct thread *cur = thread_current ();
   struct inode *inode;
-  struct dir *dir = dir_reopen (cur->cwd);
+  struct dir *dir;
   // struct dir *root = dir_open_root ();
-  // if (cur->cwd != ){
-    // dir = cur->cwd;
+  // if (cur->cwd == NULL){
+    dir = dir_open_root ();
   // }
   // else
-  printf ("dir %p %p\n", dir, cur->cwd);
-    dir = dir_open_root ();
-  printf ("dir %p\n", dir);
+    // dir = cur->cwd;
 
   size_t index = 0;
   bool success = (dir != NULL

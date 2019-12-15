@@ -202,6 +202,8 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  struct thread *cur = thread_current ();
+  if (cur->cwd != NULL) t->cwd = dir_reopen(cur->cwd);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -533,7 +535,7 @@ init_thread (struct thread *t, const char *name, int priority)
   struct thread *cur = running_thread ();
 
   t->parent = cur;
-  t->cwd = cur->cwd;
+  t->cwd = NULL;
   list_init (&(t->child_list));
   sema_init (&(t->child_sema), 0);
   sema_init (&(t->load_sema), 0);
