@@ -35,7 +35,15 @@ dir_get_parent (struct dir *dir_ptr)
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  bool success = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  if (success) {
+    struct inode *inode = inode_open (sector);
+    struct dir_entry f;
+    f.in_use = true;
+    f.parent_sector = inode_get_inumber (inode);
+    inode_write_at (inode, &f, sizeof f, 0);
+  }
+  return success;
 }
 
 /* Opens and returns the directory for the given INODE, of which
