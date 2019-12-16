@@ -184,7 +184,15 @@ int wait (pid_t pid) {
 bool create (const char *file, unsigned initial_size) {
   check_valid_addr (file);
   lock_acquire (&filesys_lock);
-  bool success = filesys_create (file, initial_size);
+  if (strlen (file) > 14) {
+    lock_release (&filesys_lock);
+    return false;
+  }
+  char file_name[15];
+  struct dir *dir_ptr = NULL;
+  parse_path (file, file_name, &dir_ptr);
+  bool success = filesys_create_dir (file_name, dir_ptr, initial_size, false);
+  dir_close (dir_ptr);
   lock_release (&filesys_lock);
   return success;
 }
@@ -192,7 +200,10 @@ bool create (const char *file, unsigned initial_size) {
 bool remove (const char *file) {
   check_valid_addr (file);
   lock_acquire (&filesys_lock);
-  bool success = filesys_remove (file);
+  char file_name[15];
+  struct dir *dir_ptr = NULL;
+  parse_path (file, file_name, &dir_ptr);
+  bool success = filesys_remove_dir (file_name, dir_ptr);
   lock_release (&filesys_lock);
   return success;
 }
@@ -200,7 +211,10 @@ bool remove (const char *file) {
 int open (const char *file) {
   check_valid_addr (file);
   lock_acquire (&filesys_lock);
-  struct file *fp = filesys_open (file);
+  char file_name[15];
+  struct dir *dir_ptr = NULL;
+  parse_path (file, file_name, &dir_ptr);
+  struct file *fp = filesys_open_dir (file_name, dir_ptr);
   struct thread *cur = thread_current ();
   if (fp) {
     for (int i = 2; i < 128; i++) {
@@ -256,11 +270,13 @@ int write (int fd, const void *buffer, unsigned size) {
     result = size;
   } else if (fd > 1 && fd < 128) {
     struct file *fp = cur->fd[fd];
-    if (fp) {
-      buffer_set_pin ((void *)buffer, size, true);
-      result = file_write (fp, buffer, size);
-      buffer_set_pin ((void *)buffer, size, false);
-    }
+    struct inode *inode = file_get_inode (fp);
+    if (!inode_dir (inode))
+      if (fp) {
+        buffer_set_pin ((void *)buffer, size, true);
+        result = file_write (fp, buffer, size);
+        buffer_set_pin ((void *)buffer, size, false);
+      }
   }
   lock_release (&filesys_lock);
   return result;
@@ -430,15 +446,21 @@ chdir (const char *dir)
   // lock_acquire (&filesys_lock);
   parse_path (dir, file_name, &dir_ptr);
   // lock_release (&filesys_lock);
-  printf("%s filename %p dir_ptr\n",file_name, dir_ptr);
-  if (strchr(file_name, 47) != NULL)
+  if (strchr (file_name, 47) != NULL)
     return false;
+  if (file_name != NULL && strchr(file_name, 47) != NULL) {
+    return false;
+  }
 
+  char *eof = "\0";
   struct inode *inode;
-  if (dir_lookup (dir_ptr, file_name, &inode))
-    dir_ptr = dir_open (inode);
-  else {
-    return false;
+  //open only if it still has something to open
+  if (file_name[0] != eof[0]) {
+    if (dir_lookup (dir_ptr, file_name, &inode))
+      dir_ptr = dir_open (inode);
+    else {
+      return false;
+    }
   }
 
   struct thread *cur = thread_current ();
@@ -450,20 +472,19 @@ chdir (const char *dir)
 bool
 mkdir (const char *dir)
 {
-  if (strlen(dir) == 0)
+  if (strlen (dir) == 0)
     return false;
   char file_name[15];
   struct dir *dir_ptr = NULL;
   // lock_acquire (&filesys_lock);
   parse_path (dir, file_name, &dir_ptr);
-  // lock_release (&filesys_lock);
-  if (strchr(file_name, 47) != NULL)
+  if (strchr (file_name, 47) != NULL)
     return false;
+  bool success = filesys_create_dir (file_name, dir_ptr, 0, true);
+  dir_close (dir_ptr);
+  // lock_release (&filesys_lock);
 
-  bool success = filesys_create_dir (file_name, dir_ptr);
-  // dir_close (dir_ptr);
-
-  return success; 
+  return success;
 }
 
 bool
@@ -488,68 +509,83 @@ inumber (int fd)
   return 0;
 }
 
-void parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
-
-  //string token 
-  // . .. / 
-  // if . current directory
-  // if .. parent directory 
-  // if starts with / it's absolute path
-  // if starts with characters it's relative path
+bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
 
   /* 
   
+  string token 
+  . .. / 
+  if . current directory
+  if .. parent directory 
+  if starts with / it's absolute path
+  if starts with characters it's relative path
+
   /path/to/some/absolute
+  path/to/some/relative
 
   */
+  
   char *save;
   char *token;
   char *root = "/";
   struct inode *inode;
   size_t len = strlen(dir);
   char dir_copy[len];
-  bool abs_flag = false;
   strlcpy (dir_copy, dir, len+1);
   struct thread *cur = thread_current ();
 
   if (dir_copy[0] == root[0]) {
     *dir_ptr = dir_open_root ();
-    abs_flag = true;
   }
   else {
     *dir_ptr = dir_reopen(cur->cwd);
   }
   
-  token = strtok_r (dir_copy, "/", &save);
-
-  if (!token) 
-    return;
-
-  if (dir_lookup (*dir_ptr, token, &inode)) {
-    *dir_ptr = dir_open (inode);
+  if (strchr(dir_copy, 47) == NULL) {
+    strlcpy(file_name, dir_copy, strlen(dir_copy) +1 );
+    return true;
   }
-  else {
+
+  token = strtok_r (dir_copy, "/", &save);
+  if (!token) {
+    strlcpy (file_name, "\0", 1);
+    return false;
+  }
+
+  if (strlen(save) == 0) {
     strlcpy (file_name, token, strlen(token)+1);
-    return;
+    return true;
+  }
+
+  if (dir_lookup (*dir_ptr, token, &inode) && inode_dir(inode))
+    *dir_ptr = dir_open (inode);
+  else {
+    strlcat (token, save, strlen(token)+strlen(save)+1);
+    strlcpy (file_name, token, strlen(token)+1);
+    return true;
   }
 
   while (token) {
     token = strtok_r (NULL, "/", &save);
 
-    if (!token) 
-      return;
-
-    if (dir_lookup (*dir_ptr, token, &inode)){
-      *dir_ptr = dir_open (inode);
+    if (!token) {
+      strlcpy (file_name, "\0", 1);
+      return false;
     }
+
+    if (strlen(save) == 0) {
+      strlcpy (file_name, token, strlen(token)+1);
+      return true;
+    }
+
+    if (dir_lookup (*dir_ptr, token, &inode) && inode_dir(inode))
+      *dir_ptr = dir_open (inode);
     else {
-      strlcpy (file_name, token, strlen(token));
-      return;
+      strlcat (token, save, strlen(token)+strlen(save)+1);
+      strlcpy (file_name, token, strlen(token)+1);
+      return true;
     }
   };
 
-  return;
+  return true;
 }
-
-
-

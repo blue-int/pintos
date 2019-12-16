@@ -32,6 +32,6 @@ bool mkdir (const char *dir);
 bool readdir (int fd, char *name);
 bool isdir (int fd);
 int inumber (int fd);
-void parse_path (const char *dir, char *file_name, struct dir **dir_ptr);
+bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr);
 
 #endif /* userprog/syscall.h */

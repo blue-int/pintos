@@ -31,7 +31,7 @@ filesys_init (bool format)
 
   struct thread *cur = thread_current ();
   cur->cwd = dir_open_root ();
-  dir_close (cur->cwd);
+  // dir_close (cur->cwd);
 
   free_map_open ();
 }
@@ -54,14 +54,7 @@ filesys_create (const char *name, off_t initial_size)
 {
   block_sector_t inode_sector = 0;
   struct thread *cur = thread_current ();
-  struct inode *inode;
-  struct dir *dir;
-  // struct dir *root = dir_open_root ();
-  // if (cur->cwd == NULL){
-    dir = dir_open_root ();
-  // }
-  // else
-    // dir = cur->cwd;
+  struct dir *dir = dir_reopen (cur->cwd);
 
   size_t index = 0;
   bool success = (dir != NULL
@@ -76,14 +69,14 @@ filesys_create (const char *name, off_t initial_size)
 }
 
 bool
-filesys_create_dir (const char *name, void *dir_ptr) 
+filesys_create_dir (const char *name, void *dir_ptr, off_t initial_size, bool is_dir) 
 {
   block_sector_t inode_sector = 0;
   struct dir *dir = (struct dir *) dir_ptr;
   size_t index = 0;
   bool success = (dir != NULL
                   && free_map_allocate (&inode_sector, &index)
-                  && inode_create (inode_sector, 0, true)
+                  && inode_create (inode_sector, initial_size, is_dir)
                   && dir_add (dir, name, inode_sector));
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
@@ -99,7 +92,8 @@ filesys_create_dir (const char *name, void *dir_ptr)
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_root ();
+  struct thread *cur = thread_current ();
+  struct dir *dir = dir_reopen (cur->cwd);
   struct inode *inode = NULL;
 
   if (dir != NULL)
@@ -108,6 +102,20 @@ filesys_open (const char *name)
 
   return file_open (inode);
 }
+
+struct file *
+filesys_open_dir (const char *name, void *dir_ptr)
+{
+  struct dir *dir = (struct dir *) dir_ptr;
+  struct inode *inode = NULL;
+
+  if (dir != NULL)
+    dir_lookup (dir, name, &inode);
+  dir_close (dir);
+
+  return file_open (inode);
+}
+
 
 /* Deletes the file named NAME.
    Returns true if successful, false on failure.
@@ -122,6 +130,17 @@ filesys_remove (const char *name)
 
   return success;
 }
+
+bool
+filesys_remove_dir (const char *name, void *dir_ptr) 
+{
+  struct dir *dir = (struct dir *) dir_ptr;
+  bool success = dir != NULL && dir_remove (dir, name);
+  dir_close (dir); 
+
+  return success;
+}
+
 
 /* Formats the file system. */
 static void
