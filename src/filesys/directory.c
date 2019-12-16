@@ -16,10 +16,21 @@ struct dir
 /* A single directory entry. */
 struct dir_entry 
   {
+    block_sector_t parent_sector;
     block_sector_t inode_sector;        /* Sector number of header. */
     char name[NAME_MAX + 1];            /* Null terminated file name. */
     bool in_use;                        /* In use or free? */
   };
+
+struct dir *
+dir_get_parent (struct dir *dir_ptr)
+{
+  struct dir_entry e;
+  size_t ofs = 0;
+  inode_read_at (dir_ptr->inode, &e, sizeof e, ofs);
+  printf ("%d\n", e.parent_sector);
+  return dir_open (inode_open (e.parent_sector));
+}
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
@@ -172,6 +183,8 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
+  e.parent_sector = inode_get_inumber (dir->inode);
+  printf ("sector %d\n", e.parent_sector);
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
@@ -201,14 +214,16 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  /* Erase directory entry. */
-  e.in_use = false;
-  if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
-    goto done;
+  if (e.in_use == false) {
+    /* Erase directory entry. */
+    e.in_use = false;
+    if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
+      goto done;
 
-  /* Remove inode. */
-  inode_remove (inode);
-  success = true;
+    /* Remove inode. */
+    inode_remove (inode);
+    success = true;
+  }
 
  done:
   inode_close (inode);

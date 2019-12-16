@@ -203,6 +203,9 @@ bool remove (const char *file) {
   char file_name[15];
   struct dir *dir_ptr = NULL;
   parse_path (file, file_name, &dir_ptr);
+  printf ("%s v %s\n", file, file_name);
+  if (strcmp (file_name, ".") == 0 || strcmp (file_name, "..") == 0)
+    return false;
   bool success = filesys_remove_dir (file_name, dir_ptr);
   lock_release (&filesys_lock);
   return success;
@@ -214,6 +217,7 @@ int open (const char *file) {
   char file_name[15];
   struct dir *dir_ptr = NULL;
   parse_path (file, file_name, &dir_ptr);
+  printf ("open %s\n", file_name);
   struct file *fp = filesys_open_dir (file_name, dir_ptr);
   struct thread *cur = thread_current ();
   if (fp) {
@@ -465,6 +469,7 @@ chdir (const char *dir)
 
   struct thread *cur = thread_current ();
   cur->cwd = dir_ptr;
+  printf ("%p\n", cur->cwd);
 
   return true;
 }
@@ -487,7 +492,13 @@ mkdir (const char *dir)
 bool
 readdir (int fd, char *name) 
 {
-  return true;
+  struct thread *cur = thread_current ();
+  struct file *fp = cur->fd[fd];
+  char file_name[15];
+  bool success = dir_readdir ((struct dir *)fp, file_name);
+  if (success)
+    strlcpy (name, file_name, strlen (file_name + 1));
+  return success;
 }
 
 bool
@@ -503,7 +514,11 @@ isdir (int fd)
 int
 inumber (int fd) 
 {
-  return 0;
+  struct thread *cur = thread_current ();
+  struct file *fp = cur->fd[fd];
+  struct inode *inode = file_get_inode (fp);
+
+  return inode_get_inumber (inode);
 }
 
 bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
@@ -521,7 +536,7 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
   path/to/some/relative
 
   */
-  
+
   char *save;
   char *token;
   char *root = "/";
@@ -549,17 +564,24 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
     return false;
   }
 
+
   if (strlen(save) == 0) {
     strlcpy (file_name, token, strlen (token) + 1);
     return true;
   }
 
-  if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
-    *dir_ptr = dir_open (inode);
-  else {
-    strlcat (token, save, strlen (token) + strlen (save) + 1);
-    strlcpy (file_name, token, strlen(token)+1);
-    return true;
+  if (strcmp (token, "..") == 0) {
+    printf ("parse %p\n", cur->cwd);
+    *dir_ptr = dir_get_parent (*dir_ptr);
+    printf ("hello\n");
+  } else {
+    if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
+      *dir_ptr = dir_open (inode);
+    else {
+      strlcat (token, save, strlen (token) + strlen (save) + 1);
+      strlcpy (file_name, token, strlen(token)+1);
+      return true;
+    }
   }
 
   while (token) {
@@ -575,12 +597,16 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
       return true;
     }
 
-    if (dir_lookup (*dir_ptr, token, &inode) && inode_dir(inode))
-      *dir_ptr = dir_open (inode);
-    else {
-      strlcat (token, save, strlen (token) + strlen (save) + 1);
-      strlcpy (file_name, token, strlen (token) + 1);
-      return true;
+    if (strcmp (token, "..") == 0) {
+      *dir_ptr = dir_get_parent (*dir_ptr);
+    } else {
+      if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
+        *dir_ptr = dir_open (inode);
+      else {
+        strlcat (token, save, strlen (token) + strlen (save) + 1);
+        strlcpy (file_name, token, strlen(token)+1);
+        return true;
+      }
     }
   }
 
