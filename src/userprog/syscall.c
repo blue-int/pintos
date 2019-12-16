@@ -203,7 +203,6 @@ bool remove (const char *file) {
   char file_name[15];
   struct dir *dir_ptr = NULL;
   parse_path (file, file_name, &dir_ptr);
-  printf ("%s v %s\n", file, file_name);
   if (strcmp (file_name, ".") == 0 || strcmp (file_name, "..") == 0)
     return false;
   bool success = filesys_remove_dir (file_name, dir_ptr);
@@ -216,9 +215,19 @@ int open (const char *file) {
   lock_acquire (&filesys_lock);
   char file_name[15];
   struct dir *dir_ptr = NULL;
+  struct file *fp;
   parse_path (file, file_name, &dir_ptr);
-  printf ("open %s\n", file_name);
-  struct file *fp = filesys_open_dir (file_name, dir_ptr);
+  
+  if (strcmp (file_name, ".") == 0) {
+    fp = (struct file *)dir_ptr;
+  }
+  else if (strcmp (file_name, "..") == 0) {
+    fp = (struct file *)dir_get_parent (dir_ptr);
+  }
+  else {
+    fp = filesys_open_dir (file_name, dir_ptr);
+  }
+
   struct thread *cur = thread_current ();
   if (fp) {
     for (int i = 2; i < 128; i++) {
@@ -469,7 +478,6 @@ chdir (const char *dir)
 
   struct thread *cur = thread_current ();
   cur->cwd = dir_ptr;
-  printf ("%p\n", cur->cwd);
 
   return true;
 }
@@ -484,7 +492,7 @@ mkdir (const char *dir)
   parse_path (dir, file_name, &dir_ptr);
   if (strchr (file_name, 47) != NULL)
     return false;
-  bool success = filesys_create_dir (file_name, dir_ptr, 0, true);
+  bool success = filesys_create_dir (file_name, dir_ptr, 24, true);
   dir_close (dir_ptr);
   return success;
 }
@@ -564,24 +572,26 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
     return false;
   }
 
-
   if (strlen(save) == 0) {
     strlcpy (file_name, token, strlen (token) + 1);
     return true;
   }
 
-  if (strcmp (token, "..") == 0) {
-    printf ("parse %p\n", cur->cwd);
-    *dir_ptr = dir_get_parent (*dir_ptr);
-    printf ("hello\n");
-  } else {
-    if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
-      *dir_ptr = dir_open (inode);
-    else {
-      strlcat (token, save, strlen (token) + strlen (save) + 1);
-      strlcpy (file_name, token, strlen(token)+1);
-      return true;
-    }
+  if (strcmp (token, ".") != 0) {
+    if (strcmp (token, "..") == 0)
+      {
+        *dir_ptr = dir_get_parent (*dir_ptr);
+      }
+    else
+      {
+        if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
+          *dir_ptr = dir_open (inode);
+        else {
+          strlcat (token, save, strlen (token) + strlen (save) + 1);
+          strlcpy (file_name, token, strlen(token)+1);
+          return true;
+        }
+      }
   }
 
   while (token) {
@@ -597,16 +607,21 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
       return true;
     }
 
-    if (strcmp (token, "..") == 0) {
-      *dir_ptr = dir_get_parent (*dir_ptr);
-    } else {
-      if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
-        *dir_ptr = dir_open (inode);
-      else {
-        strlcat (token, save, strlen (token) + strlen (save) + 1);
-        strlcpy (file_name, token, strlen(token)+1);
-        return true;
-      }
+    if (strcmp (token, ".") != 0) {
+      if (strcmp (token, "..") == 0)
+        {
+          *dir_ptr = dir_get_parent (*dir_ptr);
+        }
+      else
+        {
+          if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
+            *dir_ptr = dir_open (inode);
+          else {
+            strlcat (token, save, strlen (token) + strlen (save) + 1);
+            strlcpy (file_name, token, strlen(token)+1);
+            return true;
+          }
+        }
     }
   }
 

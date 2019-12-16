@@ -26,9 +26,7 @@ struct dir *
 dir_get_parent (struct dir *dir_ptr)
 {
   struct dir_entry e;
-  size_t ofs = 0;
-  inode_read_at (dir_ptr->inode, &e, sizeof e, ofs);
-  printf ("%d\n", e.parent_sector);
+  inode_read_at (dir_ptr->inode, &e, sizeof e, 0);
   return dir_open (inode_open (e.parent_sector));
 }
 
@@ -183,9 +181,13 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
-  e.parent_sector = inode_get_inumber (dir->inode);
-  printf ("sector %d\n", e.parent_sector);
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+
+  struct dir_entry f;
+  f.in_use = true;
+  f.parent_sector = inode_get_inumber (dir->inode);
+  struct inode *inode = inode_open (inode_sector);
+  inode_write_at (inode, &f, sizeof f, 0);
 
  done:
   return success;
@@ -237,6 +239,7 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
+  dir->pos += 24;
 
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
