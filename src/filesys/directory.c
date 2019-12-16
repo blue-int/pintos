@@ -148,7 +148,7 @@ dir_lookup (const struct dir *dir, const char *name,
    Fails if NAME is invalid (i.e. too long) or a disk or memory
    error occurs. */
 bool
-dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
+dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is_dir)
 {
   struct dir_entry e;
   off_t ofs;
@@ -183,11 +183,13 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   e.inode_sector = inode_sector;
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
-  struct dir_entry f;
-  f.in_use = true;
-  f.parent_sector = inode_get_inumber (dir->inode);
-  struct inode *inode = inode_open (inode_sector);
-  inode_write_at (inode, &f, sizeof f, 0);
+  if (is_dir) {
+    struct dir_entry f;
+    f.in_use = true;
+    f.parent_sector = inode_get_inumber (dir->inode);
+    struct inode *inode = inode_open (inode_sector);
+    inode_write_at (inode, &f, sizeof f, 0);
+  }
 
  done:
   return success;
@@ -215,17 +217,25 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
-
-  if (e.in_use == false) {
-    /* Erase directory entry. */
-    e.in_use = false;
-    if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
-      goto done;
-
-    /* Remove inode. */
-    inode_remove (inode);
-    success = true;
+  
+  if (inode_dir (inode)) {
+    off_t offset = 24;
+    while (inode_read_at (inode, &e, sizeof e, offset) == sizeof e) 
+      {
+        offset += sizeof e;
+        if (e.in_use) {
+          goto done;
+        }
+      }
   }
+  /* Erase directory entry. */
+  e.in_use = false;
+  if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
+    goto done;
+
+  /* Remove inode. */
+  inode_remove (inode);
+  success = true;
 
  done:
   inode_close (inode);

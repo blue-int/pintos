@@ -59,7 +59,7 @@ filesys_create (const char *name, off_t initial_size)
   bool success = (dir != NULL
                   && free_map_allocate (&inode_sector, &index)
                   && inode_create (inode_sector, initial_size, false)
-                  && dir_add (dir, name, inode_sector));
+                  && dir_add (dir, name, inode_sector, false));
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
@@ -76,7 +76,7 @@ filesys_create_dir (const char *name, void *dir_ptr, off_t initial_size, bool is
   bool success = (dir != NULL
                   && free_map_allocate (&inode_sector, &index)
                   && inode_create (inode_sector, initial_size, is_dir)
-                  && dir_add (dir, name, inode_sector));
+                  && dir_add (dir, name, inode_sector, is_dir));
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
 
@@ -110,8 +110,8 @@ filesys_open_dir (const char *name, void *dir_ptr)
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
   
-  if (strlen (name) == 0)
-    return dir_ptr;
+  // if (strlen (name) == 0)
+  //   return dir_ptr;
   dir_close (dir);
 
   return file_open (inode);

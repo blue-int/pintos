@@ -191,6 +191,11 @@ bool create (const char *file, unsigned initial_size) {
   char file_name[15];
   struct dir *dir_ptr = NULL;
   parse_path (file, file_name, &dir_ptr);
+  struct inode *inode = dir_get_inode (dir_ptr);
+  if (inode_get_removed (inode)) {
+    lock_release (&filesys_lock);
+    return false;
+  }
   bool success = filesys_create_dir (file_name, dir_ptr, initial_size, false);
   dir_close (dir_ptr);
   lock_release (&filesys_lock);
@@ -212,22 +217,34 @@ bool remove (const char *file) {
 
 int open (const char *file) {
   check_valid_addr (file);
-  lock_acquire (&filesys_lock);
   char file_name[15];
   struct dir *dir_ptr = NULL;
   struct file *fp;
+  if (strlen (file) == 0)
+    return -1;
+  lock_acquire (&filesys_lock);
   parse_path (file, file_name, &dir_ptr);
-  
-  if (strcmp (file_name, ".") == 0) {
+
+  if (strcmp (file_name, ".") == 0 || strlen (file_name) == 0) {
     fp = (struct file *)dir_ptr;
+    struct inode *inode = dir_get_inode (dir_ptr);
+    if (inode_get_removed (inode)) {
+      lock_release (&filesys_lock);
+      return -1;
+    }
   }
   else if (strcmp (file_name, "..") == 0) {
     fp = (struct file *)dir_get_parent (dir_ptr);
+    struct inode *inode = dir_get_inode (dir_ptr);
+    if (inode_get_removed (inode)) {
+      lock_release (&filesys_lock);
+      return -1;
+    }
   }
   else {
     fp = filesys_open_dir (file_name, dir_ptr);
   }
-
+  // printf ("%p fp\n", fp);
   struct thread *cur = thread_current ();
   if (fp) {
     for (int i = 2; i < 128; i++) {
