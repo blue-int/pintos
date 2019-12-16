@@ -476,14 +476,11 @@ mkdir (const char *dir)
     return false;
   char file_name[15];
   struct dir *dir_ptr = NULL;
-  // lock_acquire (&filesys_lock);
   parse_path (dir, file_name, &dir_ptr);
   if (strchr (file_name, 47) != NULL)
     return false;
   bool success = filesys_create_dir (file_name, dir_ptr, 0, true);
   dir_close (dir_ptr);
-  // lock_release (&filesys_lock);
-
   return success;
 }
 
@@ -529,20 +526,20 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
   char *token;
   char *root = "/";
   struct inode *inode;
-  size_t len = strlen(dir);
+  size_t len = strlen (dir);
   char dir_copy[len];
-  strlcpy (dir_copy, dir, len+1);
+  strlcpy (dir_copy, dir, len + 1);
   struct thread *cur = thread_current ();
 
   if (dir_copy[0] == root[0]) {
     *dir_ptr = dir_open_root ();
   }
   else {
-    *dir_ptr = dir_reopen(cur->cwd);
+    *dir_ptr = dir_reopen (cur->cwd);
   }
   
-  if (strchr(dir_copy, 47) == NULL) {
-    strlcpy(file_name, dir_copy, strlen(dir_copy) +1 );
+  if (strchr (dir_copy, 47) == NULL) {
+    strlcpy (file_name, dir_copy, strlen (dir_copy) + 1);
     return true;
   }
 
@@ -553,14 +550,14 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
   }
 
   if (strlen(save) == 0) {
-    strlcpy (file_name, token, strlen(token)+1);
+    strlcpy (file_name, token, strlen (token) + 1);
     return true;
   }
 
-  if (dir_lookup (*dir_ptr, token, &inode) && inode_dir(inode))
+  if (dir_lookup (*dir_ptr, token, &inode) && inode_dir (inode))
     *dir_ptr = dir_open (inode);
   else {
-    strlcat (token, save, strlen(token)+strlen(save)+1);
+    strlcat (token, save, strlen (token) + strlen (save) + 1);
     strlcpy (file_name, token, strlen(token)+1);
     return true;
   }
@@ -573,19 +570,19 @@ bool parse_path (const char *dir, char *file_name, struct dir **dir_ptr) {
       return false;
     }
 
-    if (strlen(save) == 0) {
-      strlcpy (file_name, token, strlen(token)+1);
+    if (strlen (save) == 0) {
+      strlcpy (file_name, token, strlen (token) + 1);
       return true;
     }
 
     if (dir_lookup (*dir_ptr, token, &inode) && inode_dir(inode))
       *dir_ptr = dir_open (inode);
     else {
-      strlcat (token, save, strlen(token)+strlen(save)+1);
-      strlcpy (file_name, token, strlen(token)+1);
+      strlcat (token, save, strlen (token) + strlen (save) + 1);
+      strlcpy (file_name, token, strlen (token) + 1);
       return true;
     }
-  };
+  }
 
   return true;
 }

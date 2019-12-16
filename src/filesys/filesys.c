@@ -31,7 +31,6 @@ filesys_init (bool format)
 
   struct thread *cur = thread_current ();
   cur->cwd = dir_open_root ();
-  // dir_close (cur->cwd);
 
   free_map_open ();
 }
@@ -95,7 +94,6 @@ filesys_open (const char *name)
   struct thread *cur = thread_current ();
   struct dir *dir = dir_reopen (cur->cwd);
   struct inode *inode = NULL;
-
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
   dir_close (dir);
@@ -115,7 +113,6 @@ filesys_open_dir (const char *name, void *dir_ptr)
 
   return file_open (inode);
 }
-
 
 /* Deletes the file named NAME.
    Returns true if successful, false on failure.
@@ -141,10 +138,7 @@ filesys_remove_dir (const char *name, void *dir_ptr)
   return success;
 }
 
-
 /* Formats the file system. */
-static void
-do_format (void)
 {
   printf ("Formatting file system...");
   free_map_create ();
