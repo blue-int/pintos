@@ -139,6 +139,8 @@ filesys_remove_dir (const char *name, void *dir_ptr)
 }
 
 /* Formats the file system. */
+static void
+do_format (void)
 {
   printf ("Formatting file system...");
   free_map_create ();
