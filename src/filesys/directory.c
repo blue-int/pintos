@@ -249,7 +249,8 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
-  dir->pos += 24;
+  if (dir->pos == 0 && inode_dir (dir_get_inode (dir)))
+    dir->pos += 24;
 
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {

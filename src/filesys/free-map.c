@@ -39,7 +39,7 @@ bool free_map_allocate (block_sector_t *sectorp, size_t *index)
   }
   
   if (sector == BITMAP_ERROR)
-    PANIC("Free map allocate failed\n");
+    return false;
 
   if (sector != BITMAP_ERROR)
     *sectorp = sector;

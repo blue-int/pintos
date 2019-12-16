@@ -244,7 +244,6 @@ int open (const char *file) {
   else {
     fp = filesys_open_dir (file_name, dir_ptr);
   }
-  // printf ("%p fp\n", fp);
   struct thread *cur = thread_current ();
   if (fp) {
     for (int i = 2; i < 128; i++) {
@@ -482,6 +481,15 @@ chdir (const char *dir)
     return false;
   }
 
+  if (strcmp (file_name, ".") == 0) 
+    return true;
+
+  if (strcmp (file_name, "..") == 0) {
+    struct thread *cur = thread_current ();
+    cur->cwd = dir_get_parent (dir_ptr);
+    dir_close (dir_ptr);
+    return true;
+  }
   char *eof = "\0";
   struct inode *inode;
   //open only if it still has something to open
@@ -522,7 +530,7 @@ readdir (int fd, char *name)
   char file_name[15];
   bool success = dir_readdir ((struct dir *)fp, file_name);
   if (success)
-    strlcpy (name, file_name, strlen (file_name + 1));
+    strlcpy (name, file_name, strlen (file_name) + 1);
   return success;
 }
 
